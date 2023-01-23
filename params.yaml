@@ -1,0 +1,12 @@
+dataset: ../dvc_benchmarks/data/pacbio.fasta #data/pacbio_redux_127_1024.fasta #
+groundtruth: data/cigars0x2_127.txt
+sets_number: 60 #20184
+dpus_number: 10
+cpus: 32
+
+nw_params:
+  match: 2
+  mismatch: -4
+  gap_opening1: 4 #0 for linear
+  gap_extension1: 2
+  width: 128 # always 128 for dpu
