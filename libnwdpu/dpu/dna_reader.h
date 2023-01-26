@@ -9,7 +9,7 @@
 #include "../../cdefs.h"
 
 /**
- * @brief a sequential adn reader. It is group aware.
+ * @brief a sequential dna reader. It is group aware.
  *
  */
 typedef struct dna_reader
@@ -20,7 +20,7 @@ typedef struct dna_reader
 } __attribute__((aligned(8))) dna_reader;
 
 /**
- * @brief Get the adn reader object, initialize the structure
+ * @brief Get the dna reader object, initialize the structure
  *
  * @param buffer aligned buffer (group aware)
  * @param mram_ptr mram pointer to the sequence beginning
@@ -57,18 +57,18 @@ static inline uint8_t dna_reader_next(dna_reader *reader)
 }
 
 /**
- * @brief get next nucleotide in adn reader if i<j otherwise return c
+ * @brief get next nucleotide in dna reader if i<j otherwise return c
  *
- * @param adn dna_reader
- * @param i represent index in adn
- * @param l represent size of adn
+ * @param dna dna_reader
+ * @param i represent index in dna
+ * @param l represent size of dna
  * @param c default value if i > l
  * @return uint8_t
  */
-static inline uint8_t next_nucleotide(dna_reader *adn, uint32_t i, uint32_t l, uint8_t c)
+static inline uint8_t next_nucleotide(dna_reader *dna, uint32_t i, uint32_t l, uint8_t c)
 {
     if (i < l)
-        return dna_reader_next(adn);
+        return dna_reader_next(dna);
 
     return c;
 }

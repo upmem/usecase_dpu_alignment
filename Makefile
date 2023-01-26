@@ -10,6 +10,7 @@ all: ${NW}
 
 clean:
 	$(RM) ${NW}
+	cd ./libnwdpu/dpu && make clean
 
 SRC := ./src/main.cpp ./src/fasta.cpp ./libnwdpu/host/dpu_common.cpp
 

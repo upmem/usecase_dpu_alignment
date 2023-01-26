@@ -189,8 +189,8 @@ struct align_t
     uint32_t s2;                       /// second sequence index
     uint32_t l1;                       /// first sequence lenght
     uint32_t l2;                       /// second sequence length
-    dna_reader adn1;                   /// first sequence adn reader
-    dna_reader adn2;                   /// second sequence adn reader
+    dna_reader dna1;                   /// first sequence dna reader
+    dna_reader dna2;                   /// second sequence dna reader
     uint32_t s_off;                    /// index of results: score and cigar
     uint8_t *av;                       /// pointer to av buffer 128 value
     uint8_t *bv;                       /// pointer to bv buffer 128 value
@@ -358,7 +358,7 @@ static inline void shift_av()
 
     shift_left_u8(av);
     av[W_MAX - 1] = next_nucleotide(
-        &align_data[align_id].adn1,
+        &align_data[align_id].dna1,
         align_data[align_id].i++,
         align_data[align_id].l1,
         'X');
@@ -375,7 +375,7 @@ static inline void shift_bv()
 
     shift_right_u8(bv);
     bv[0] = next_nucleotide(
-        &align_data[align_id].adn2,
+        &align_data[align_id].dna2,
         align_data[align_id].j++,
         align_data[align_id].l2,
         'Y');
@@ -385,8 +385,8 @@ void init_pv();
 void init_ppv();
 void init_ev();
 void init_fv();
-uint32_t init_adn1();
-uint32_t init_adn2();
+uint32_t init_dna1();
+uint32_t init_dna2();
 
 /**
  * @brief tasklets are waiting for next function to compute.

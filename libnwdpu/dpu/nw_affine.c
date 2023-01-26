@@ -24,8 +24,8 @@ __host NW_dpu_output output;
 __mram uint8_t cigars[MAX_CIGAR_SIZE];
 __mram uint32_t cigar_indexes[METADATA_MAX_NUMBER_OF_SCORES];
 
-wram_aligned_buffer_64 adn_reader_buffer1;
-wram_aligned_buffer_64 adn_reader_buffer2;
+wram_aligned_buffer_64 dna_reader_buffer1;
+wram_aligned_buffer_64 dna_reader_buffer2;
 
 wram_aligned_buffer_32 direction_buffer;
 wram_aligned_buffer_32 trace_wram_buffer;
@@ -121,18 +121,18 @@ void init_fv()
   fv[(W_MAX / 2)] = -gapoe;
 }
 
-uint32_t init_adn1()
+uint32_t init_dna1()
 {
   const uint32_t align_id = group();
 
-  align_data[align_id].adn1 = get_dna_reader(
-      &adn_reader_buffer1,
+  align_data[align_id].dna1 = get_dna_reader(
+      &dna_reader_buffer1,
       &sequences[metadata.indexes[align_data[align_id].s1]],
       align_id);
 
   int w2 = (W_MAX >> 1);
 
-  dna_reader *s1 = &align_data[align_id].adn1;
+  dna_reader *s1 = &align_data[align_id].dna1;
   uint8_t *av = align_data[align_id].av;
   uint32_t l1 = align_data[align_id].l1;
 
@@ -148,17 +148,17 @@ uint32_t init_adn1()
   return i;
 }
 
-uint32_t init_adn2()
+uint32_t init_dna2()
 {
   const uint32_t align_id = group();
   int w2 = (W_MAX >> 1);
 
-  align_data[align_id].adn2 = get_dna_reader(
-      &adn_reader_buffer2,
+  align_data[align_id].dna2 = get_dna_reader(
+      &dna_reader_buffer2,
       &sequences[metadata.indexes[align_data[align_id].s2]],
       align_id);
 
-  dna_reader *s2 = &align_data[align_id].adn2;
+  dna_reader *s2 = &align_data[align_id].dna2;
   uint8_t *bv = align_data[align_id].bv;
   uint32_t l2 = align_data[align_id].l2;
 
@@ -189,11 +189,11 @@ int align()
 
   align_data[align_id].l1 = metadata.lengths[align_data[align_id].s1];
   align_data[align_id].av = buf_av[align_id];
-  align_data[align_id].i = init_adn1();
+  align_data[align_id].i = init_dna1();
 
   align_data[align_id].l2 = metadata.lengths[align_data[align_id].s2];
   align_data[align_id].bv = buf_bv[align_id];
-  align_data[align_id].j = init_adn2();
+  align_data[align_id].j = init_dna2();
 
   init_pv();
   init_ppv();
@@ -272,10 +272,10 @@ int align()
   uint32_t offset = ((align_data[align_id].l1 + align_data[align_id].l2) * W_MAX) - W_MAX + (W_MAX >> 1) + (align_data[align_id].down - align_data[align_id].l2);
 
   mram_buffered_array_64 res = get_mram_buffered_array_64(
-      &adn_reader_buffer1,
+      &dna_reader_buffer1,
       &cigars[cigar_indexes[align_data[align_id].s_off]],
       align_id);
-  mram_2bits_array_64 trace_reader = create_mram_2bits_array_64(&adn_reader_buffer2, trace_buffer[align_id], align_id);
+  mram_2bits_array_64 trace_reader = create_mram_2bits_array_64(&dna_reader_buffer2, trace_buffer[align_id], align_id);
   mram_bit_array_32 te_reader = create_mram_bit_array_32(&t_e_wram_buffer, te_buffer[align_id], align_id);
   mram_bit_array_32 tf_reader = create_mram_bit_array_32(&t_f_wram_buffer, tf_buffer[align_id], align_id);
 
