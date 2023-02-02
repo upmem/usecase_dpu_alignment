@@ -3,7 +3,7 @@
 ## libraries
 
 > - UPMEM SDK
-> - c++17 filesystem library
+> - c++17 with filesystem library (gcc vesrion >=8)
 > - yaml-cpp
 
 Makefile
