@@ -1,23 +1,23 @@
-# Build
+# Needleman and Wunsch on DPU
 
-## libraries
+## Libraries needed
 
 > - UPMEM SDK
 > - c++17 with filesystem library (gcc vesrion >=8)
 > - yaml-cpp
 
-Makefile
+## Build
 
 > make
 
-# Getting Started
+## Run application
 
-run  `./dpu_alignment`
+> ./dpu_alignment
 
 Alignment parameters can be changed in `params.yaml`
 
 
-# dataset
+## Dataset format
 
 must have the form:
 
@@ -31,4 +31,4 @@ must have the form:
 .
 ```
 
-All sequence with same number will be pair-aligned, same set number sequences must be contiguous !
+All sequences with same number will be pair-aligned, same set number sequences must be contiguous !
