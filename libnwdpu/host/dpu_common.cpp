@@ -219,7 +219,7 @@ void send_cigar_input(dpu_set_t &dpu_set, std::vector<NW_dpu_input> &inputs)
                              METADATA_MAX_NUMBER_OF_SCORES * sizeof(uint32_t), DPU_XFER_ASYNC));
 }
 
-void gather_cigar_output(dpu_set_t &dpu_set, std::vector<NW_dpu_output> &outputs, std::vector<std::vector<uint8_t>> &cigars)
+void gather_cigar_output(dpu_set_t &dpu_set, std::vector<NW_dpu_output> &outputs, std::vector<std::vector<char>> &cigars)
 {
     dpu_set_t dpu{};
     uint32_t each_dpu = 0;

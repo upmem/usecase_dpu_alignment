@@ -39,7 +39,7 @@ uint32_t add_sequence(std::vector<uint8_t> &dseq, const Sequence &seq, uint32_t 
 std::vector<NW_dpu_input> fair_dispatch(const Sets &data, size_t nr_of_dpus);
 
 void send_cigar_input(dpu_set_t &dpu_set, std::vector<NW_dpu_input> &inputs);
-void gather_cigar_output(dpu_set_t &dpu_set, std::vector<NW_dpu_output> &outputs, std::vector<std::vector<uint8_t>> &cigars);
+void gather_cigar_output(dpu_set_t &dpu_set, std::vector<NW_dpu_output> &outputs, std::vector<std::vector<char>> &cigars);
 
 static inline auto dpu_pipeline(std::string dpu_bin_path, const NW_Parameters &p, size_t nr_dpu, const Sets &sets)
 {
@@ -68,7 +68,7 @@ static inline auto dpu_pipeline(std::string dpu_bin_path, const NW_Parameters &p
     DPU_ASSERT(dpu_launch(dpus, DPU_ASYNCHRONOUS));
 
     std::vector<NW_dpu_output> outputs(nr_dpu);
-    std::vector<std::vector<uint8_t>> dpu_cigars(nr_dpu);
+    std::vector<std::vector<char>> dpu_cigars(nr_dpu);
     gather_cigar_output(dpus, outputs, dpu_cigars);
 
     dpu_sync(dpus);
@@ -97,7 +97,7 @@ static inline auto dpu_pipeline(std::string dpu_bin_path, const NW_Parameters &p
             {
                 res[i].score = outputs[d].scores[s];
                 res[i].cigar.resize(outputs[d].lengths[s]);
-                res[i].cigar.assign(reinterpret_cast<char *>(&dpu_cigars[d][dpu_inputs[d].cigar_indexes[s]]), outputs[d].lengths[s]);
+                res[i].cigar.assign(&dpu_cigars[d][dpu_inputs[d].cigar_indexes[s]], outputs[d].lengths[s]);
 
                 s++;
                 i++;
