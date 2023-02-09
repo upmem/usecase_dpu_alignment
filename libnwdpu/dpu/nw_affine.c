@@ -132,7 +132,7 @@ uint32_t init_dna1()
 
   int w2 = (W_MAX >> 1);
 
-  dna_reader *s1 = &align_data[align_id].dna1;
+  dna_reader *reader = &align_data[align_id].dna1;
   uint8_t *av = align_data[align_id].av;
   uint32_t l1 = align_data[align_id].l1;
 
@@ -141,7 +141,7 @@ uint32_t init_dna1()
   {
     av[i] = 'X';
     if (i < l1)
-      av[w2 + i] = dna_reader_next(s1);
+      av[w2 + i] = dna_reader_next(reader);
     else
       av[w2 + i] = 'X';
   }
@@ -158,7 +158,7 @@ uint32_t init_dna2()
       &sequences[metadata.indexes[align_data[align_id].s2]],
       align_id);
 
-  dna_reader *s2 = &align_data[align_id].dna2;
+  dna_reader *reader = &align_data[align_id].dna2;
   uint8_t *bv = align_data[align_id].bv;
   uint32_t l2 = align_data[align_id].l2;
 
@@ -167,7 +167,7 @@ uint32_t init_dna2()
   {
     bv[w2 + i] = 'Y';
     if (i < l2)
-      bv[w2 - 1 - i] = dna_reader_next(s2);
+      bv[w2 - 1 - i] = dna_reader_next(reader);
     else
       bv[w2 - 1 - i] = 'Y';
   }
