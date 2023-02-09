@@ -205,8 +205,6 @@ int align()
 
   align_data[align_id].direction_array = create_mram_bit_array_32(&direction_buffer, dirs[align_id], align_id);
 
-  align_data[align_id].down = 0;
-
   align_data[align_id].trace = trace_wram_buffer.buffer + (32LU * align_id);
   align_data[align_id].t_e = t_e_wram_buffer.buffer + (32LU * align_id);
   align_data[align_id].t_f = t_f_wram_buffer.buffer + (32LU * align_id);
@@ -226,7 +224,9 @@ int align()
   mram_write(align_data[align_id].t_e, te_buffer[align_id], 16LU);
   mram_write(align_data[align_id].t_f, tf_buffer[align_id], 16LU);
 
-  align_data[align_id].offset = W_MAX / 4;
+  int32_t offset = W_MAX / 4;
+
+  int32_t down = 0;
 
   // Main DP loop, one iteration computes one frontwave
   for (uint32_t d = 1; d < align_data[align_id].l1 + align_data[align_id].l2; d++)
@@ -238,7 +238,7 @@ int align()
     if (align_data[align_id].dir == DOWN)
     {
       parallel_sr();
-      align_data[align_id].down++;
+      down++;
       align_data[align_id].uv = align_data[align_id].pv;
       align_data[align_id].lv = align_data[align_id].pv - 1;
       shift_right_if_previous_direction_is_down(align_data[align_id].prev_dir, align_data[align_id].ppv);
@@ -255,10 +255,10 @@ int align()
 
     compute_affine();
 
-    mram_write(align_data[align_id].trace, trace_buffer[align_id] + align_data[align_id].offset, 32LU);
-    mram_write(align_data[align_id].t_e, te_buffer[align_id] + (align_data[align_id].offset / 2), 16LU);
-    mram_write(align_data[align_id].t_f, tf_buffer[align_id] + (align_data[align_id].offset / 2), 16LU);
-    align_data[align_id].offset += 32LU;
+    mram_write(align_data[align_id].trace, trace_buffer[align_id] + offset, 32LU);
+    mram_write(align_data[align_id].t_e, te_buffer[align_id] + (offset / 2), 16LU);
+    mram_write(align_data[align_id].t_f, tf_buffer[align_id] + (offset / 2), 16LU);
+    offset += 32LU;
 
     int32_t *tmpv = align_data[align_id].pv;
     align_data[align_id].pv = align_data[align_id].ppv;
@@ -269,7 +269,7 @@ int align()
 
   int32_t d = align_data[align_id].l1 + align_data[align_id].l2 - 1;
 
-  uint32_t offset = ((align_data[align_id].l1 + align_data[align_id].l2) * W_MAX) - W_MAX + (W_MAX >> 1) + (align_data[align_id].down - align_data[align_id].l2);
+  offset = ((align_data[align_id].l1 + align_data[align_id].l2) * W_MAX) - W_MAX + (W_MAX >> 1) + (down - align_data[align_id].l2);
 
   mram_buffered_array_64 res = get_mram_buffered_array_64(
       &dna_reader_buffer1,
@@ -354,7 +354,7 @@ int align()
   // traceback is from end to start. cigar needs to be change to start to end.
   reverse(&cigars[cigar_indexes[align_data[align_id].s_off]], sp);
 
-  return align_data[align_id].pv[(W_MAX >> 1) + (align_data[align_id].down - align_data[align_id].l2)];
+  return align_data[align_id].pv[(W_MAX >> 1) + (down - align_data[align_id].l2)];
 }
 
 extern uint64_t nw_perf_cnt;

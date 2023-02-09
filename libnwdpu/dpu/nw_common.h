@@ -201,8 +201,6 @@ struct align_t
     int32_t *uv;                       /// pointer to pv or pv+1
     int32_t *lv;                       /// pointer to pv -1 or pv
     uint8_t *trace;                    /// pointer to trace buffer
-    uint32_t offset;                   /// offset for trace buffers
-    int32_t down;                      /// counter of times band went down, needed for last cell position on pv.
     Direction dir;                     /// current band direction
     Direction prev_dir;                /// previous band direction
     mram_bit_array_32 direction_array; /// bit array keeping all band direction in MRAM
