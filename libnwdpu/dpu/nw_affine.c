@@ -174,17 +174,8 @@ uint32_t init_dna2()
   return i;
 }
 
-/**
- * @brief Align sequences from its group.
- *        Done with adaptive band as defined here:
- *        https://www.biorxiv.org/content/10.1101/130633v2
- *
- * @return Alignment score
- */
-int align()
+void align_initialisations()
 {
-  // initialize all buffers and values
-
   const uint32_t align_id = group();
 
   align_data[align_id].l1 = metadata.lengths[align_data[align_id].s1];
@@ -215,14 +206,32 @@ int align()
   align_data[align_id].trace[(W_MAX >> 1) / 4 - 1] = (UP << 6);
   mram_write(align_data[align_id].trace, trace_buffer[align_id], 32LU);
 
-  for (int k = 0; k < W_MAX / 8; k++)
+// initialising 8 values at a time with 64bit, 0.1% gain ^^.
+#pragma unroll
+  for (int k = 0; k < (W_MAX / 8) / 8; k++)
   {
-    align_data[align_id].t_e[k] = 0xFF;
-    align_data[align_id].t_f[k] = 0xFF;
+    *(((uint64_t *)align_data[align_id].t_e) + k) = -1;
+    *(((uint64_t *)align_data[align_id].t_f) + k) = -1;
   }
 
   mram_write(align_data[align_id].t_e, te_buffer[align_id], 16LU);
   mram_write(align_data[align_id].t_f, tf_buffer[align_id], 16LU);
+}
+
+/**
+ * @brief Align sequences from its group.
+ *        Done with adaptive band as defined here:
+ *        https://www.biorxiv.org/content/10.1101/130633v2
+ *
+ * @return Alignment score
+ */
+int align()
+{
+  // initialize all buffers and values
+
+  const uint32_t align_id = group();
+
+  align_initialisations();
 
   int32_t offset = W_MAX / 4;
 
