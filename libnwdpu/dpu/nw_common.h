@@ -31,56 +31,39 @@ __mram uint8_t tf_buffer[NR_GROUPS][40000 / 4 * W_MAX];    /// 2 * 40000 seq on 
 extern NW_dpu_metadata_input metadata;
 
 /**
- * @brief rotate left underlying uint8_t array, endian-aware
- *
- * @param a &a[0] of a[0..3] array to rotate
- */
-static inline void rotate_left_8(uint32_t *a)
-{
-    __asm__("ror %[a], %[a], 8"
-            : [a] "+r"(*a));
-}
-
-/**
- * @brief rotate right underlying uint8_t array, endian-aware
- *
- * @param a &a[0] of a[0..3] array to rotate
- */
-static inline void rotate_right_8(uint32_t *a)
-{
-    __asm__("rol %[a], %[a], 8"
-            : [a] "+r"(*a));
-}
-
-/**
- * @brief wrapper around right shifting a 128 bytes buffer
+ * @brief shift right a 128 bytes buffer
  *
  * @param vec
  */
 static inline void shift_right_u8(uint8_t *vec)
 {
+    uint64_t *p = (uint64_t *)vec;
+
 #pragma unroll
-    for (uint32_t i = 127 & ~3; i > 0; i -= 4)
+    for (int i = 15; i > 0; i--)
     {
-        rotate_right_8((uint32_t *)(&vec[i]));
-        vec[i] = vec[i - 1];
+        p[i] = p[i] << 8;
+        ((uint8_t *)(p + i))[0] = ((uint8_t *)(p + i))[-1];
     }
-    rotate_right_8((uint32_t *)(&vec[0]));
+    p[0] = p[0] << 8;
 }
 
 /**
- * @brief wrapper around left shifting a 128 bytes buffer
+ * @brief shift left a 128 bytes buffer
  *
  * @param vec
  */
 static inline void shift_left_u8(uint8_t *vec)
 {
+    uint64_t *p = (uint64_t *)vec;
+
 #pragma unroll
-    for (uint32_t i = 0; i < 127; i += 4)
+    for (uint32_t i = 0; i < 15; i++)
     {
-        rotate_left_8((uint32_t *)(&vec[i]));
-        vec[i + 3] = vec[i + 4];
+        p[i] = p[i] >> 8;
+        ((uint8_t *)(p + i))[7] = ((uint8_t *)(p + i))[8];
     }
+    p[15] = p[15] >> 8;
 }
 
 /**
@@ -90,9 +73,17 @@ static inline void shift_left_u8(uint8_t *vec)
  */
 static inline void shift_right_s(int32_t *vec)
 {
+    uint64_t *p = (uint64_t *)vec;
+
+    vec[127] = vec[126];
+
 #pragma unroll
-    for (uint32_t i = 127; i > 0; i--)
-        vec[i] = vec[i - 1];
+    for (int i = 62; i >= 0; i--)
+    {
+        register uint64_t val = p[i];
+        vec[i * 2 + 2] = val >> 32;
+        vec[i * 2 + 1] = val;
+    }
 }
 
 /**
@@ -102,9 +93,16 @@ static inline void shift_right_s(int32_t *vec)
  */
 static inline void shift_left_s(int32_t *vec)
 {
+    uint64_t *p = (uint64_t *)vec;
+
+    vec[0] = vec[1];
 #pragma unroll
-    for (uint32_t i = 0; i < 127; i++)
-        vec[i] = vec[i + 1];
+    for (int i = 1; i < 64; i++)
+    {
+        register uint64_t val = p[i];
+        vec[i * 2] = val >> 32;
+        vec[i * 2 - 1] = val;
+    }
 }
 
 /**

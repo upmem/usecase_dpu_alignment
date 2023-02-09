@@ -35,10 +35,10 @@ wram_aligned_buffer_32 t_f_wram_buffer;
 
 __host struct m_buf
 {
-  int32_t ev[W_MAX];
-  int32_t fv[W_MAX];
-  int32_t pv[W_MAX + 2];
-  int32_t ppv[W_MAX + 2];
+  __attribute__((aligned(64))) int32_t ev[W_MAX];
+  __attribute__((aligned(64))) int32_t fv[W_MAX];
+  __attribute__((aligned(64))) int32_t pv[W_MAX + 4];
+  __attribute__((aligned(64))) int32_t ppv[W_MAX + 4];
 } align_buffers[NR_GROUPS];
 
 __dma_aligned uint8_t buf_av[NR_GROUPS][W_MAX];
@@ -61,7 +61,7 @@ void init_pv()
   const int32_t gape = metadata.gap_extension;
   const int32_t gapoe = gapo + gape;
 
-  align_data[align_id].pv = align_buffers[align_id].pv + 1;
+  align_data[align_id].pv = align_buffers[align_id].pv + 2;
 
   int32_t *pv = align_data[align_id].pv;
   pv[-1] = INT32_MIN / 2;
@@ -77,7 +77,7 @@ void init_pv()
 void init_ppv()
 {
   const uint32_t align_id = group();
-  align_data[align_id].ppv = align_buffers[align_id].ppv + 1;
+  align_data[align_id].ppv = align_buffers[align_id].ppv + 2;
 
   int32_t *ppv = align_data[align_id].ppv;
   ppv[-1] = INT32_MIN / 2;
@@ -228,7 +228,7 @@ int align()
 
   align_data[align_id].offset = W_MAX / 4;
 
-  // Main DP loop, one iteration computes one flontwave
+  // Main DP loop, one iteration computes one frontwave
   for (uint32_t d = 1; d < align_data[align_id].l1 + align_data[align_id].l2; d++)
   {
 
