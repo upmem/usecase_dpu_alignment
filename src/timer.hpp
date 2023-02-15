@@ -52,13 +52,15 @@ public:
         clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &cpu_time_start);
     }
 
-    void print() const
+    void print(const std::string &prefix = "") const
     {
-        printf("times:\n"
-               "  wall:  %.2f\n"
-               "  cpu:   %.2f\n"
-               "  ratio: %.1f\n",
-               wall(), cpu(), cpu() / wall());
+        printf(
+            (prefix + "times:\n" +
+             prefix + "  wall:  %.2f\n" +
+             prefix + "  cpu:   %.2f\n" +
+             prefix + "  ratio: %.1f\n")
+                .c_str(),
+            wall(), cpu(), cpu() / wall());
     }
 };
 

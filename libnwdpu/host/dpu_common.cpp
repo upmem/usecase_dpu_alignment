@@ -2,11 +2,28 @@
  * Copyright 2022 - UPMEM
  */
 
+#include <algorithm>
 #include <cassert>
 #include <cstdio>
 #include <fstream>
 
 #include "dpu_common.hpp"
+
+extern "C"
+{
+#include <dpu.h>
+}
+
+/**
+ * @brief Structure regrouping all data to be send to a dpu
+ *
+ */
+typedef struct NW_dpu_input
+{
+    NW_dpu_metadata_input metadata{};      /// metadata describing the sequences
+    CompressedSequences sequences{};       /// all sequences in one single buffer
+    std::vector<uint32_t> cigar_indexes{}; /// start index of each cigar memory space
+} NW_dpu_input;
 
 uint32_t compressed_size(const Sequence &seq)
 {
@@ -113,10 +130,9 @@ static inline size_t add_dpu_load(const auto &set, auto &dpu_compute_load, size_
     return idx;
 }
 
-std::vector<NW_dpu_input> fair_dispatch(const Sets &data, size_t nr_of_dpus)
+std::vector<NW_dpu_input> fair_dispatch(const Sets &data, size_t nr_of_dpus, const NW_Parameters &p)
 {
-    printf("\n> Using fair dispatch:\n");
-    printf("   sets number: %zu\n", data.size());
+    printf("\nDispatch:\n");
     std::vector<NW_dpu_input> dpu_input(nr_of_dpus);
     for (auto &d : dpu_input)
     {
@@ -137,7 +153,7 @@ std::vector<NW_dpu_input> fair_dispatch(const Sets &data, size_t nr_of_dpus)
 
     size_t margin = find_lowest_limit(data, mean_compute_load, nr_of_dpus);
 
-    printf("   margin: %.1f%%\n", static_cast<float>(margin * 100) / static_cast<float>(mean_compute_load));
+    printf("  margin: %.1f%%\n", static_cast<float>(margin * 100) / static_cast<float>(mean_compute_load));
 
     for (const auto &set : data)
     {
@@ -187,7 +203,15 @@ std::vector<NW_dpu_input> fair_dispatch(const Sets &data, size_t nr_of_dpus)
                "dpu sequence buffer overflow!\n");
     }
 
-    printf("   dpu not used: %zu\n", nr_of_dpus - 1 - dpu_index);
+    printf("  dpu not used: %zu\n", nr_of_dpus - 1 - dpu_index);
+
+    for (auto &dpu : dpu_input)
+    {
+        dpu.metadata.match = p.match;
+        dpu.metadata.mismatch = p.mismatch;
+        dpu.metadata.gap_opening = p.gap_opening;
+        dpu.metadata.gap_extension = p.gap_extension;
+    }
 
     return dpu_input;
 }
@@ -239,4 +263,56 @@ void gather_cigar_output(dpu_set_t &dpu_set, std::vector<NW_dpu_output> &outputs
     }
     DPU_ASSERT(dpu_push_xfer(dpu_set, DPU_XFER_FROM_DPU, "cigars", 0,
                              MAX_CIGAR_SIZE, DPU_XFER_ASYNC));
+}
+
+std::vector<nw_t> dpu_to_cpu_format(const auto &sets, const auto &inputs, const auto &outputs, const auto &cigars)
+{
+    std::vector<nw_t> cpu_output(count_unique_pair(sets));
+
+    auto comb = [](auto n)
+    { return n * (n - 1) / 2; };
+
+    size_t i = 0;
+    for (size_t d = 0; d < inputs.size(); d++)
+    {
+        size_t s = 0;
+        for (size_t n = 0; n < inputs[d].metadata.number_of_sets; n++)
+            for (int ns = 0; ns < comb(inputs[d].metadata.set_sizes[n]); ns++)
+            {
+                cpu_output[i].score = outputs[d].scores[s];
+                cpu_output[i].cigar.resize(outputs[d].lengths[s]);
+                cpu_output[i].cigar.assign(&cigars[d][inputs[d].cigar_indexes[s]], outputs[d].lengths[s]);
+
+                s++;
+                i++;
+            }
+    }
+
+    return cpu_output;
+}
+
+std::vector<nw_t> dpu_pipeline(std::string dpu_bin_path, const NW_Parameters &p, size_t nr_dpu, const Sets &sets)
+{
+    Timer dispatch_time{};
+    auto dpu_inputs = fair_dispatch(sets, nr_dpu, p);
+    dispatch_time.print("  ");
+
+    std::vector<NW_dpu_output> dpu_outputs(nr_dpu);
+    std::vector<std::vector<char>> dpu_cigars(nr_dpu);
+
+    printf("\nAllocating DPUs\n");
+    dpu_set_t dpus{};
+    DPU_ASSERT(dpu_alloc(nr_dpu, NULL, &dpus));
+    DPU_ASSERT(dpu_load(dpus, dpu_bin_path.c_str(), NULL));
+
+    printf("Transfer and Launch (Async)\n");
+    send_cigar_input(dpus, dpu_inputs);
+    DPU_ASSERT(dpu_launch(dpus, DPU_ASYNCHRONOUS));
+    gather_cigar_output(dpus, dpu_outputs, dpu_cigars);
+    dpu_sync(dpus);
+
+    dump_to_file("counters.txt", dpu_outputs, [](const auto &e)
+                 { return e.perf_counter; });
+
+    return dpu_to_cpu_format(sets, dpu_inputs, dpu_outputs, dpu_cigars);
 }

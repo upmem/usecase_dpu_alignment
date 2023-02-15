@@ -6,6 +6,7 @@
 #define AD18B383_F97E_4512_98DA_46CE2947ACDD
 
 #include <array>
+#include <filesystem>
 #include <vector>
 
 #include "../cdefs.h"
@@ -30,10 +31,8 @@ struct NW_Parameters
 {
     int match;
     int mismatch;
-    int32_t gap_opening1;
-    int32_t gap_extension1;
-    int32_t gap_opening2;
-    int32_t gap_extension2;
+    int32_t gap_opening;
+    int32_t gap_extension;
     int width;
     SimilarityMatrix smat;
 
@@ -50,10 +49,8 @@ struct NW_Parameters
                "  mismatch:      %d\n"
                "  gap opening:   %d\n"
                "  gap extension: %d\n"
-               "  gap opening:   %d\n"
-               "  gap extension: %d\n"
                "  width:         %d\n\n",
-               match, mismatch, gap_opening1, gap_extension1, gap_opening2, gap_extension2, width);
+               match, mismatch, gap_opening, gap_extension, width);
     }
 
     constexpr NW_Parameters(
@@ -61,14 +58,10 @@ struct NW_Parameters
         int _miss,
         int32_t _gapo1,
         int32_t _gape1,
-        int32_t _gapo2,
-        int32_t _gape2,
         int _width) : match(_match),
                       mismatch(_miss),
-                      gap_opening1(_gapo1),
-                      gap_extension1(_gape1),
-                      gap_opening2(_gapo2),
-                      gap_extension2(_gape2),
+                      gap_opening(_gapo1),
+                      gap_extension(_gape1),
                       width(_width),
                       smat(make_similarity_matrix(_match, _miss))
     {
@@ -91,8 +84,8 @@ struct Cigar : public std::string
             else
             {
                 if (gap == 0)
-                    score -= params.gap_opening1, gap++;
-                score -= params.gap_extension1;
+                    score -= params.gap_opening, gap++;
+                score -= params.gap_extension;
             }
         }
         return score;
@@ -210,10 +203,37 @@ constexpr inline auto operator|(T &&t, F f)
     return f(std::forward<T>(t));
 }
 
+void dump_to_file(const std::filesystem::path &filename, const auto &Container, const auto &Accessor)
+{
+    std::ofstream file(filename);
+
+    for (const auto &e : Container)
+        file << Accessor(e) << '\n';
+}
+
 [[noreturn]] static inline void exit(std::string message)
 {
     printf("%s\n", message.c_str());
     std::exit(EXIT_FAILURE);
+}
+
+static constexpr inline auto resize(size_t i)
+{
+    return [i](Sets &&s) -> Sets
+    {
+        if (s.size() > i)
+            s.resize(i);
+        return s;
+    };
+}
+
+static inline auto print_size(const std::string &str)
+{
+    return [str](Sets &&sets)
+    {
+        printf(("  " + str + ": %lu\n").c_str(), sets.size());
+        return sets;
+    };
 }
 
 #endif /* AD18B383_F97E_4512_98DA_46CE2947ACDD */
