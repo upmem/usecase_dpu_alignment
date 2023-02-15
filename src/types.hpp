@@ -207,6 +207,8 @@ void dump_to_file(const std::filesystem::path &filename, const auto &Container, 
 {
     std::ofstream file(filename);
 
+    printf("Writing %s\n", filename.c_str());
+
     for (const auto &e : Container)
         file << Accessor(e) << '\n';
 }

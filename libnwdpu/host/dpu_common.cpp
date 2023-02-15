@@ -311,8 +311,8 @@ std::vector<nw_t> dpu_pipeline(std::string dpu_bin_path, const NW_Parameters &p,
     gather_cigar_output(dpus, dpu_outputs, dpu_cigars);
     dpu_sync(dpus);
 
-    dump_to_file("counters.txt", dpu_outputs, [](const auto &e)
-                 { return e.perf_counter; });
+    // Add to dump DPU counters and analyse their individual workload.
+    // dump_to_file("counters.txt", dpu_outputs, [](const auto &e) { return e.perf_counter; });
 
     return dpu_to_cpu_format(sets, dpu_inputs, dpu_outputs, dpu_cigars);
 }
