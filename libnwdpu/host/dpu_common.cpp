@@ -305,7 +305,7 @@ std::vector<nw_t> dpu_pipeline(std::string dpu_bin_path, const NW_Parameters &p,
     DPU_ASSERT(dpu_alloc(nr_dpu, NULL, &dpus));
     DPU_ASSERT(dpu_load(dpus, dpu_bin_path.c_str(), NULL));
 
-    printf("Transfer and Launch (Async)\n");
+    printf("Send, Launch, Gather (Async)\n");
     send_cigar_input(dpus, dpu_inputs);
     DPU_ASSERT(dpu_launch(dpus, DPU_ASYNCHRONOUS));
     gather_cigar_output(dpus, dpu_outputs, dpu_cigars);

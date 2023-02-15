@@ -1,5 +1,5 @@
 CC := dpu-upmem-dpurte-clang
-FLAGSP := -O3 -DNR_TASKLETS=24 -DNR_GROUPS=6 -fshort-enums -DSTACK_SIZE_DEFAULT=384
+FLAGSP := -O3 -fno-builtin -DNR_TASKLETS=24 -DNR_GROUPS=6 -fshort-enums -DSTACK_SIZE_DEFAULT=384
 
 NWP := nw_affine
 

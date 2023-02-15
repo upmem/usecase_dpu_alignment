@@ -15,6 +15,7 @@
 > ./dpu_alignment
 
 Alignment parameters can be changed in `params.yaml`
+Output scores and cigars in scores.txt and cigars.txt respectively.
 
 
 ## Dataset format
