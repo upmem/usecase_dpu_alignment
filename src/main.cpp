@@ -14,23 +14,23 @@ auto read_parameters(const std::filesystem::path &filename)
     auto path = config["dataset"].as<std::string>();
     auto sets_number = config["sets_number"].as<uint32_t>();
     auto dpus_number = config["dpus_number"].as<uint32_t>();
-
     auto params = config["nw_params"];
 
-    NW_Parameters nwp(params["match"].as<int>(),
+    return std::tuple{
+        path,
+        sets_number,
+        NW_Parameters{params["match"].as<int>(),
                       params["mismatch"].as<int>(),
                       params["gap_opening"].as<int>(),
-                      params["gap_extension"].as<int>(), 128);
-
-    return std::tuple{path, sets_number, nwp, dpus_number};
+                      params["gap_extension"].as<int>(), 128},
+        dpus_number};
 }
 
 int main()
 {
     const auto home = std::filesystem::canonical("/proc/self/exe").parent_path();
 
-    auto [dataset_path, nsets, nw_parameters, ndpus] =
-        read_parameters(home / "params.yaml");
+    auto [dataset_path, nsets, nw_parameters, ndpus] = read_parameters(home / "params.yaml");
 
     printf("DPU mode:\n"
            "  forcing width to 128.\n"
