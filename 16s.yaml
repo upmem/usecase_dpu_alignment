@@ -1,0 +1,9 @@
+dataset: data/s1000a.fa # data/out_ncbi_16SRNA_Bacteria.fasta #
+dpus_number: 2000
+
+nw_params:
+  match: 2
+  mismatch: -4
+  gap_opening: 4 #0 for linear
+  gap_extension: 2
+  width: 128
