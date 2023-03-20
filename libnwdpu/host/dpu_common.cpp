@@ -119,10 +119,10 @@ static inline size_t add_dpu_load(const auto &set, auto &dpu_compute_load, size_
     return idx;
 }
 
-std::vector<NW_dpu_input> fair_dispatch(const Sets &data, size_t nr_of_dpus, const NW_Parameters &p)
+std::vector<NwInputCigar> fair_dispatch(const Sets &data, size_t nr_of_dpus, const NW_Parameters &p)
 {
     printf("\nDispatch:\n");
-    std::vector<NW_dpu_input> dpu_input(nr_of_dpus);
+    std::vector<NwInputCigar> dpu_input(nr_of_dpus);
     for (auto &d : dpu_input)
     {
         d.sequences.reserve(SCORE_MAX_SEQUENCES_TOTAL_SIZE);
@@ -205,7 +205,7 @@ std::vector<NW_dpu_input> fair_dispatch(const Sets &data, size_t nr_of_dpus, con
     return dpu_input;
 }
 
-void send_cigar_input(dpu_set_t &dpu_set, std::vector<NW_dpu_input> &inputs)
+void send_cigar_input(dpu_set_t &dpu_set, std::vector<NwInputCigar> &inputs)
 {
     dpu_set_t dpu{};
     uint32_t each_dpu = 0;
@@ -317,7 +317,7 @@ std::vector<nw_t> dpu_pipeline(std::string dpu_bin_path, const NW_Parameters &p,
 
 auto Set_to_dpuSet(const Set &data, const NW_Parameters &params)
 {
-    NW_score_input dpu_input;
+    NwInputScore dpu_input;
 
     dpu_input.sequences.reserve(SCORE_MAX_SEQUENCES_TOTAL_SIZE);
     dpu_input.metadata.match = params.match;
@@ -348,7 +348,7 @@ auto Set_to_dpuSet(const Set &data, const NW_Parameters &params)
     return dpu_input;
 }
 
-void send_input_16s(dpu_set_t &dpu_set, NW_score_input &inputs, std::vector<ComparisonMetadata> &meta)
+void send_input_16s(dpu_set_t &dpu_set, NwInputScore &inputs, std::vector<ComparisonMetadata> &meta)
 {
 
     DPU_ASSERT(dpu_broadcast_to(dpu_set, "sequences", 0, inputs.sequences.data(), inputs.sequences.size(), DPU_XFER_ASYNC));

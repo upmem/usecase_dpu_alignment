@@ -11,18 +11,18 @@
  * @brief Structure regrouping all data to be send to a dpu
  *
  */
-typedef struct NW_dpu_input
+typedef struct NwInputCigar
 {
-    NwMetadataDPU metadata{};      /// metadata describing the sequences
+    NwMetadataDPU metadata{};              /// metadata describing the sequences
     CompressedSequences sequences{};       /// all sequences in one single buffer
     std::vector<uint32_t> cigar_indexes{}; /// start index of each cigar memory space
-} NW_dpu_input;
+} NwInputCigar;
 
-typedef struct NW_score_input
+typedef struct NwInputScore
 {
     NwMetadataDPU metadata{};
     CompressedSequences sequences{};
-} NW_score_input;
+} NwInputScore;
 
 std::vector<nw_t> dpu_pipeline(std::string dpu_bin_path, const NW_Parameters &p, size_t nr_dpu, const Sets &sets);
 std::vector<int> dpu_pipeline_16s(std::string dpu_bin_path, const NW_Parameters &params, size_t ndpu, const Set &set);
