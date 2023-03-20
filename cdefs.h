@@ -61,6 +61,14 @@ typedef struct NW_dpu_metadata_input
 
 } NW_dpu_metadata_input;
 
+typedef struct Metadata_index
+{
+    uint32_t start_row;
+    uint32_t start_col;
+    uint32_t count;
+    uint32_t size;
+} Metadata_index;
+
 /**
  * @brief Structure for data send back from DPU to host.
  * Contains the prefcounter, score of each pair alignment
@@ -73,5 +81,12 @@ typedef struct NW_dpu_output
     int32_t scores[METADATA_MAX_NUMBER_OF_SCORES];   /// score of pair alignment
     uint16_t lengths[METADATA_MAX_NUMBER_OF_SCORES]; /// length of CIGARs
 } NW_dpu_output;
+
+typedef struct NW_score_output
+{
+    int32_t scores[SCORE_METADATA_MAX_NUMBER_OF_SCORES];
+    uint32_t nr_score;
+    uint64_t perf_counter;
+} NW_score_output;
 
 #endif /* EFB491BB_CE51_45FE_BB8B_8CD42179622B */
