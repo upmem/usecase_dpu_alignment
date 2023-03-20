@@ -25,6 +25,7 @@
  */
 typedef enum
 {
+    /// @brief  Score origin possible values
     DMISS = 0,  /// score is from mismatch
     DMATCH = 1, /// score is from match
     LEFT = 2,   /// score is from left gap
@@ -37,6 +38,7 @@ typedef enum
  */
 typedef enum
 {
+    /// @brief Direction possible values
     DOWN = 0, /// band goes down
     RIGHT = 1 /// band goes right
 } Direction;
@@ -50,6 +52,7 @@ typedef enum
  */
 typedef struct NW_dpu_metadata_input
 {
+    /// @brief Collection of all common data needed for N&W
     uint32_t indexes[DPU_MAX_NUMBER_OF_SEQUENCES];       /// index of Nth sequence in sequence buffer
     uint16_t lengths[DPU_MAX_NUMBER_OF_SEQUENCES];       /// length of Nth sequence
     uint8_t set_sizes[SCORE_METADATA_MAX_NUMBER_OF_SET]; /// Size of each set sent. Max set size is 255
@@ -61,32 +64,44 @@ typedef struct NW_dpu_metadata_input
 
 } NW_dpu_metadata_input;
 
+/**
+ * @brief Represents the needed parameters to compute upper triangular comparison matrix
+ *
+ */
 typedef struct Metadata_index
 {
-    uint32_t start_row;
-    uint32_t start_col;
-    uint32_t count;
-    uint32_t size;
+    /// @brief All against all needed values
+    uint32_t start_row; /// Starting row for comparison matrix
+    uint32_t start_col; /// Starting column for comparison matrix
+    uint32_t count;     /// How many comparison to do
+    uint32_t size;      /// Total number of sequence to compare (comparison matrix size)
 } Metadata_index;
 
 /**
  * @brief Structure for data send back from DPU to host.
- * Contains the prefcounter, score of each pair alignment
+ * Contains the perfcounter, score of each pair alignment
  * and lenght of all cigars. CIGARs are sent separatly.
  *
  */
 typedef struct NW_dpu_output
 {
+    /// @brief Relevant data
     uint64_t perf_counter;                           /// performance counter, cycle or instruction can be change on dpu code size.
     int32_t scores[METADATA_MAX_NUMBER_OF_SCORES];   /// score of pair alignment
     uint16_t lengths[METADATA_MAX_NUMBER_OF_SCORES]; /// length of CIGARs
 } NW_dpu_output;
 
+/**
+ * @brief Structure for data send back from DPU to host.
+ * Contains the perfcounter and score of each comparison.
+ *
+ */
 typedef struct NW_score_output
 {
-    int32_t scores[SCORE_METADATA_MAX_NUMBER_OF_SCORES];
-    uint32_t nr_score;
-    uint64_t perf_counter;
+    /// @brief Relevant data
+    int32_t scores[SCORE_METADATA_MAX_NUMBER_OF_SCORES]; /// score of comparison
+    uint32_t nr_score;                                   /// number of comparison done
+    uint64_t perf_counter;                               /// performance counter
 } NW_score_output;
 
 #endif /* EFB491BB_CE51_45FE_BB8B_8CD42179622B */
