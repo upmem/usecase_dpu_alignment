@@ -127,7 +127,7 @@ static inline Sets lines_to_sets(const std::vector<std::string> &lines)
   return sets;
 }
 
-static inline Set lines_to_sequences(const Sequences &lines)
+static inline Set lines_to_sequences(const std::vector<std::string> &lines)
 {
   Set set(lines.size() / 2);
 
@@ -148,4 +148,11 @@ Sets read_set_fasta(const std::filesystem::path &filename)
   return read_raw_sequence_file(filename) |
          check_lines_number |
          lines_to_sets;
+}
+
+Set read_seq_fasta(const std::filesystem::path &filename)
+{
+  return read_raw_sequence_file(filename) |
+         check_lines_number |
+         lines_to_sequences;
 }
