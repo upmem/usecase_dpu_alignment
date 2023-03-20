@@ -15,12 +15,12 @@
 #define PERF_COUNT_TYPE COUNT_CYCLES
 #endif
 
-__host NW_dpu_metadata_input metadata;
+__host NwMetadataDPU metadata;
 __mram uint8_t sequences[SCORE_MAX_SEQUENCES_TOTAL_SIZE];
 
 __mram uint8_t dirs[NR_GROUPS][DPU_MAX_SEQUENCE_SIZE * 2 / 8]; // Bit array
 
-__host NW_dpu_output output;
+__host NwCigarOutput output;
 __mram uint8_t cigars[MAX_CIGAR_SIZE];
 __mram uint32_t cigar_indexes[METADATA_MAX_NUMBER_OF_SCORES];
 
@@ -32,14 +32,6 @@ wram_aligned_buffer_32 trace_wram_buffer;
 
 wram_aligned_buffer_32 t_e_wram_buffer;
 wram_aligned_buffer_32 t_f_wram_buffer;
-
-__host struct m_buf
-{
-  __attribute__((aligned(64))) int32_t ev[W_MAX];
-  __attribute__((aligned(64))) int32_t fv[W_MAX];
-  __attribute__((aligned(64))) int32_t pv[W_MAX + 4];
-  __attribute__((aligned(64))) int32_t ppv[W_MAX + 4];
-} align_buffers[NR_GROUPS];
 
 __dma_aligned uint8_t buf_av[NR_GROUPS][W_MAX];
 __dma_aligned uint8_t buf_bv[NR_GROUPS][W_MAX];
@@ -54,168 +46,48 @@ void reverse(__mram_ptr uint8_t *mram, size_t size)
   }
 }
 
-void init_pv()
-{
-  const uint32_t align_id = group();
-  const int32_t gapo = metadata.gap_opening;
-  const int32_t gape = metadata.gap_extension;
-  const int32_t gapoe = gapo + gape;
-
-  align_data[align_id].pv = align_buffers[align_id].pv + 2;
-
-  int32_t *pv = align_data[align_id].pv;
-  pv[-1] = INT32_MIN / 2;
-  pv[W_MAX] = INT32_MIN / 2;
-
-  for (uint32_t i = 0; i < W_MAX; i++)
-    pv[i] = INT32_MIN / 2;
-
-  pv[W_MAX / 2] = -gapoe;
-  pv[(W_MAX / 2) - 1] = -gapoe;
-}
-
-void init_ppv()
-{
-  const uint32_t align_id = group();
-  align_data[align_id].ppv = align_buffers[align_id].ppv + 2;
-
-  int32_t *ppv = align_data[align_id].ppv;
-  ppv[-1] = INT32_MIN / 2;
-  ppv[W_MAX] = INT32_MIN / 2;
-
-  for (uint32_t i = 0; i < W_MAX; i++)
-    ppv[i] = INT32_MIN / 2;
-
-  ppv[W_MAX / 2] = 0;
-}
-
-void init_ev()
-{
-  const uint32_t align_id = group();
-  const int32_t gapo = metadata.gap_opening;
-  const int32_t gape = metadata.gap_extension;
-  const int32_t gapoe = gapo + gape;
-
-  align_data[align_id].ev = align_buffers[align_id].ev;
-
-  int32_t *ev = align_data[align_id].ev;
-  for (uint32_t i = 0; i < W_MAX; i++)
-    ev[i] = INT32_MIN / 2;
-
-  ev[(W_MAX / 2) - 1] = -gapoe;
-}
-
-void init_fv()
-{
-  const uint32_t align_id = group();
-  const int32_t gapo = metadata.gap_opening;
-  const int32_t gape = metadata.gap_extension;
-  const int32_t gapoe = gapo + gape;
-
-  align_data[align_id].fv = align_buffers[align_id].fv;
-
-  int32_t *fv = align_data[align_id].fv;
-  for (uint32_t i = 0; i < W_MAX; i++)
-    fv[i] = INT32_MIN / 2;
-
-  fv[(W_MAX / 2)] = -gapoe;
-}
-
-uint32_t init_dna1()
-{
-  const uint32_t align_id = group();
-
-  align_data[align_id].dna1 = get_dna_reader(
-      &dna_reader_buffer1,
-      &sequences[metadata.indexes[align_data[align_id].s1]],
-      align_id);
-
-  int w2 = (W_MAX >> 1);
-
-  dna_reader *reader = &align_data[align_id].dna1;
-  uint8_t *av = align_data[align_id].av;
-  uint32_t l1 = align_data[align_id].l1;
-
-  uint32_t i = 0;
-  for (; i < w2; i++)
-  {
-    av[i] = 'X';
-    if (i < l1)
-      av[w2 + i] = dna_reader_next(reader);
-    else
-      av[w2 + i] = 'X';
-  }
-  return i;
-}
-
-uint32_t init_dna2()
-{
-  const uint32_t align_id = group();
-  int w2 = (W_MAX >> 1);
-
-  align_data[align_id].dna2 = get_dna_reader(
-      &dna_reader_buffer2,
-      &sequences[metadata.indexes[align_data[align_id].s2]],
-      align_id);
-
-  dna_reader *reader = &align_data[align_id].dna2;
-  uint8_t *bv = align_data[align_id].bv;
-  uint32_t l2 = align_data[align_id].l2;
-
-  uint32_t i = 0;
-  for (; i < w2; i++)
-  {
-    bv[w2 + i] = 'Y';
-    if (i < l2)
-      bv[w2 - 1 - i] = dna_reader_next(reader);
-    else
-      bv[w2 - 1 - i] = 'Y';
-  }
-  return i;
-}
-
 void align_initialisations()
 {
-  const uint32_t align_id = group();
+  const uint32_t pool_id = group();
 
-  align_data[align_id].l1 = metadata.lengths[align_data[align_id].s1];
-  align_data[align_id].av = buf_av[align_id];
-  align_data[align_id].i = init_dna1();
+  align_data[pool_id].l1 = metadata.lengths[align_data[pool_id].s1];
+  align_data[pool_id].av = buf_av[pool_id];
+  align_data[pool_id].i = init_dna1();
 
-  align_data[align_id].l2 = metadata.lengths[align_data[align_id].s2];
-  align_data[align_id].bv = buf_bv[align_id];
-  align_data[align_id].j = init_dna2();
+  align_data[pool_id].l2 = metadata.lengths[align_data[pool_id].s2];
+  align_data[pool_id].bv = buf_bv[pool_id];
+  align_data[pool_id].j = init_dna2();
 
   init_pv();
   init_ppv();
   init_fv();
   init_ev();
 
-  align_data[align_id].dir = RIGHT;
-  align_data[align_id].prev_dir = RIGHT;
+  align_data[pool_id].dir = RIGHT;
+  align_data[pool_id].prev_dir = RIGHT;
 
-  align_data[align_id].direction_array = create_mram_bit_array_32(&direction_buffer, dirs[align_id], align_id);
+  align_data[pool_id].direction_array = create_mram_bit_array_32(&direction_buffer, dirs[pool_id], pool_id);
 
-  align_data[align_id].trace = trace_wram_buffer.buffer + (32LU * align_id);
-  align_data[align_id].t_e = t_e_wram_buffer.buffer + (32LU * align_id);
-  align_data[align_id].t_f = t_f_wram_buffer.buffer + (32LU * align_id);
+  align_data[pool_id].trace = trace_wram_buffer.buffer + (32LU * pool_id);
+  align_data[pool_id].t_e = t_e_wram_buffer.buffer + (32LU * pool_id);
+  align_data[pool_id].t_f = t_f_wram_buffer.buffer + (32LU * pool_id);
 
-  mram_bit_array_32_set(&align_data[align_id].direction_array, 0, RIGHT);
+  mram_bit_array_32_set(&align_data[pool_id].direction_array, 0, RIGHT);
 
-  align_data[align_id].trace[(W_MAX >> 1) / 4] = LEFT;
-  align_data[align_id].trace[(W_MAX >> 1) / 4 - 1] = (UP << 6);
-  mram_write(align_data[align_id].trace, trace_buffer[align_id], 32LU);
+  align_data[pool_id].trace[(W_MAX >> 1) / 4] = LEFT;
+  align_data[pool_id].trace[(W_MAX >> 1) / 4 - 1] = (UP << 6);
+  mram_write(align_data[pool_id].trace, trace_buffer[pool_id], 32LU);
 
 // initialising 8 values at a time with 64bit, 0.1% gain ^^.
 #pragma unroll
   for (int k = 0; k < (W_MAX / 8) / 8; k++)
   {
-    *(((uint64_t *)align_data[align_id].t_e) + k) = -1;
-    *(((uint64_t *)align_data[align_id].t_f) + k) = -1;
+    *(((uint64_t *)align_data[pool_id].t_e) + k) = -1;
+    *(((uint64_t *)align_data[pool_id].t_f) + k) = -1;
   }
 
-  mram_write(align_data[align_id].t_e, te_buffer[align_id], 16LU);
-  mram_write(align_data[align_id].t_f, tf_buffer[align_id], 16LU);
+  mram_write(align_data[pool_id].t_e, te_buffer[pool_id], 16LU);
+  mram_write(align_data[pool_id].t_f, tf_buffer[pool_id], 16LU);
 }
 
 /**
@@ -229,7 +101,7 @@ int align()
 {
   // initialize all buffers and values
 
-  const uint32_t align_id = group();
+  const uint32_t pool_id = group();
 
   align_initialisations();
 
@@ -238,64 +110,64 @@ int align()
   int32_t down = 0;
 
   // Main DP loop, one iteration computes one frontwave
-  for (uint32_t d = 1; d < align_data[align_id].l1 + align_data[align_id].l2; d++)
+  for (uint32_t d = 1; d < align_data[pool_id].l1 + align_data[pool_id].l2; d++)
   {
 
-    align_data[align_id].prev_dir = align_data[align_id].dir;
-    align_data[align_id].dir = next_direction(align_data[align_id].pv, align_data[align_id].i, align_data[align_id].l1, align_data[align_id].j, align_data[align_id].l2);
+    align_data[pool_id].prev_dir = align_data[pool_id].dir;
+    align_data[pool_id].dir = next_direction(align_data[pool_id].pv, align_data[pool_id].i, align_data[pool_id].l1, align_data[pool_id].j, align_data[pool_id].l2);
 
-    if (align_data[align_id].dir == DOWN)
+    if (align_data[pool_id].dir == DOWN)
     {
       parallel_sr();
       down++;
-      align_data[align_id].uv = align_data[align_id].pv;
-      align_data[align_id].lv = align_data[align_id].pv - 1;
-      shift_right_if_previous_direction_is_down(align_data[align_id].prev_dir, align_data[align_id].ppv);
+      align_data[pool_id].uv = align_data[pool_id].pv;
+      align_data[pool_id].lv = align_data[pool_id].pv - 1;
+      shift_right_if_previous_direction_is_down(align_data[pool_id].prev_dir, align_data[pool_id].ppv);
     }
     else
     {
       parallel_sl();
-      align_data[align_id].lv = align_data[align_id].pv;
-      align_data[align_id].uv = align_data[align_id].pv + 1;
-      shift_left_if_previous_direction_is_right(align_data[align_id].prev_dir, align_data[align_id].ppv);
+      align_data[pool_id].lv = align_data[pool_id].pv;
+      align_data[pool_id].uv = align_data[pool_id].pv + 1;
+      shift_left_if_previous_direction_is_right(align_data[pool_id].prev_dir, align_data[pool_id].ppv);
     }
-    mram_bit_array_32_set(&align_data[align_id].direction_array, d, align_data[align_id].dir);
+    mram_bit_array_32_set(&align_data[pool_id].direction_array, d, align_data[pool_id].dir);
     wait_shift();
 
     compute_affine();
 
-    mram_write(align_data[align_id].trace, trace_buffer[align_id] + offset, 32LU);
-    mram_write(align_data[align_id].t_e, te_buffer[align_id] + (offset / 2), 16LU);
-    mram_write(align_data[align_id].t_f, tf_buffer[align_id] + (offset / 2), 16LU);
+    mram_write(align_data[pool_id].trace, trace_buffer[pool_id] + offset, 32LU);
+    mram_write(align_data[pool_id].t_e, te_buffer[pool_id] + (offset / 2), 16LU);
+    mram_write(align_data[pool_id].t_f, tf_buffer[pool_id] + (offset / 2), 16LU);
     offset += 32LU;
 
-    int32_t *tmpv = align_data[align_id].pv;
-    align_data[align_id].pv = align_data[align_id].ppv;
-    align_data[align_id].ppv = tmpv;
+    int32_t *tmpv = align_data[pool_id].pv;
+    align_data[pool_id].pv = align_data[pool_id].ppv;
+    align_data[pool_id].ppv = tmpv;
   }
 
   ///// Backtracing /////
 
-  int32_t d = align_data[align_id].l1 + align_data[align_id].l2 - 1;
+  int32_t d = align_data[pool_id].l1 + align_data[pool_id].l2 - 1;
 
-  offset = ((align_data[align_id].l1 + align_data[align_id].l2) * W_MAX) - W_MAX + (W_MAX >> 1) + (down - align_data[align_id].l2);
+  offset = ((align_data[pool_id].l1 + align_data[pool_id].l2) * W_MAX) - W_MAX + (W_MAX >> 1) + (down - align_data[pool_id].l2);
 
   mram_buffered_array_64 res = get_mram_buffered_array_64(
       &dna_reader_buffer1,
-      &cigars[cigar_indexes[align_data[align_id].s_off]],
-      align_id);
-  mram_2bits_array_64 trace_reader = create_mram_2bits_array_64(&dna_reader_buffer2, trace_buffer[align_id], align_id);
-  mram_bit_array_32 te_reader = create_mram_bit_array_32(&t_e_wram_buffer, te_buffer[align_id], align_id);
-  mram_bit_array_32 tf_reader = create_mram_bit_array_32(&t_f_wram_buffer, tf_buffer[align_id], align_id);
+      &cigars[cigar_indexes[align_data[pool_id].s_off]],
+      pool_id);
+  mram_2bits_array_64 trace_reader = create_mram_2bits_array_64(&dna_reader_buffer2, trace_buffer[pool_id], pool_id);
+  mram_bit_array_32 te_reader = create_mram_bit_array_32(&t_e_wram_buffer, te_buffer[pool_id], pool_id);
+  mram_bit_array_32 tf_reader = create_mram_bit_array_32(&t_f_wram_buffer, tf_buffer[pool_id], pool_id);
 
   uint32_t sp = 0; // number of steps, gives the cigar final size.
   for (; d >= 0; sp++)
   {
 
-    Direction direction = mram_bit_array_32_get(&align_data[align_id].direction_array, d);
+    Direction direction = mram_bit_array_32_get(&align_data[pool_id].direction_array, d);
     Direction direction_prev;
     if (d > 0)
-      direction_prev = mram_bit_array_32_get(&align_data[align_id].direction_array, d - 1);
+      direction_prev = mram_bit_array_32_get(&align_data[pool_id].direction_array, d - 1);
 
     int o = (direction == RIGHT) ? 0 : 1;
     int o2 = (direction != direction_prev)
@@ -327,7 +199,7 @@ int align()
         sp++;
         if (d < 0)
           break;
-        direction = mram_bit_array_32_get(&align_data[align_id].direction_array, d);
+        direction = mram_bit_array_32_get(&align_data[pool_id].direction_array, d);
         o = (direction == RIGHT) ? 0 : 1;
       }
 
@@ -345,7 +217,7 @@ int align()
         sp++;
         if (d < 0)
           break;
-        direction = mram_bit_array_32_get(&align_data[align_id].direction_array, d);
+        direction = mram_bit_array_32_get(&align_data[pool_id].direction_array, d);
         o = (direction == RIGHT) ? 0 : 1;
       }
       mram_buffered_array_64_set(&res, sp, 'D');
@@ -356,14 +228,14 @@ int align()
     d--;
   }
 
-  output.lengths[align_data[align_id].s_off] = sp;
+  output.lengths[align_data[pool_id].s_off] = sp;
 
   mram_buffered_array_64_flush(&res);
 
   // traceback is from end to start. cigar needs to be change to start to end.
-  reverse(&cigars[cigar_indexes[align_data[align_id].s_off]], sp);
+  reverse(&cigars[cigar_indexes[align_data[pool_id].s_off]], sp);
 
-  return align_data[align_id].pv[(W_MAX >> 1) + (down - align_data[align_id].l2)];
+  return align_data[pool_id].pv[(W_MAX >> 1) + (down - align_data[pool_id].l2)];
 }
 
 extern uint64_t nw_perf_cnt;
@@ -411,10 +283,11 @@ int main()
     seq1_id = 0;
     seq2_id = 1;
 
-    for (int id = 0; id < NR_TASKLETS; id++)
-      tasklet_params[id].start = (id % 4) * 32;
+    // for (int id = 0; id < NR_TASKLETS; id++)
+    // tasklet_params[id].start = (id % 4) * 32;
     perfcounter_config(PERF_COUNT_TYPE, true);
   }
+  tasklet_params[me()].start = (me() % 4) * 32;
   barrier_wait(&start_barrier);
 
   wait_for_work();
@@ -436,10 +309,10 @@ int main()
       break;
 
     // set parameter for the alignment group
-    const uint32_t align_id = group();
-    align_data[align_id].s1 = local_set_offset + seq1;
-    align_data[align_id].s2 = local_set_offset + seq2;
-    align_data[align_id].s_off = local_score_offset;
+    const uint32_t pool_id = group();
+    align_data[pool_id].s1 = local_set_offset + seq1;
+    align_data[pool_id].s2 = local_set_offset + seq2;
+    align_data[pool_id].s_off = local_score_offset;
 
     output.scores[local_score_offset] = align();
   }

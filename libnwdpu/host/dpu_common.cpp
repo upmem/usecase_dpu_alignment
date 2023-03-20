@@ -222,7 +222,7 @@ void send_cigar_input(dpu_set_t &dpu_set, std::vector<NW_dpu_input> &inputs)
         DPU_ASSERT(dpu_prepare_xfer(dpu, &inputs[each_dpu].metadata));
     }
     DPU_ASSERT(dpu_push_xfer(dpu_set, DPU_XFER_TO_DPU, "metadata", 0,
-                             sizeof(NW_dpu_metadata_input), DPU_XFER_ASYNC));
+                             sizeof(NwMetadataDPU), DPU_XFER_ASYNC));
 
     DPU_FOREACH(dpu_set, dpu, each_dpu)
     {
@@ -232,7 +232,7 @@ void send_cigar_input(dpu_set_t &dpu_set, std::vector<NW_dpu_input> &inputs)
                              METADATA_MAX_NUMBER_OF_SCORES * sizeof(uint32_t), DPU_XFER_ASYNC));
 }
 
-void gather_cigar_output(dpu_set_t &dpu_set, std::vector<NW_dpu_output> &outputs, std::vector<std::vector<char>> &cigars)
+void gather_cigar_output(dpu_set_t &dpu_set, std::vector<NwCigarOutput> &outputs, std::vector<std::vector<char>> &cigars)
 {
     dpu_set_t dpu{};
     uint32_t each_dpu = 0;
@@ -245,7 +245,7 @@ void gather_cigar_output(dpu_set_t &dpu_set, std::vector<NW_dpu_output> &outputs
         DPU_ASSERT(dpu_prepare_xfer(dpu, &outputs[each_dpu]));
     }
     DPU_ASSERT(dpu_push_xfer(dpu_set, DPU_XFER_FROM_DPU, "output", 0,
-                             sizeof(NW_dpu_output), DPU_XFER_ASYNC));
+                             sizeof(NwCigarOutput), DPU_XFER_ASYNC));
     DPU_FOREACH(dpu_set, dpu, each_dpu)
     {
         DPU_ASSERT(dpu_prepare_xfer(dpu, cigars[each_dpu].data()));
@@ -297,7 +297,7 @@ std::vector<nw_t> dpu_pipeline(std::string dpu_bin_path, const NW_Parameters &p,
     auto dpu_inputs = fair_dispatch(sets, nr_dpu, p);
     dispatch_time.print("  ");
 
-    std::vector<NW_dpu_output> dpu_outputs(nr_dpu);
+    std::vector<NwCigarOutput> dpu_outputs(nr_dpu);
     std::vector<std::vector<char>> dpu_cigars(nr_dpu);
 
     printf("\nAllocating DPUs\n");
@@ -348,11 +348,11 @@ auto Set_to_dpuSet(const Set &data, const NW_Parameters &params)
     return dpu_input;
 }
 
-void send_input_16s(dpu_set_t &dpu_set, NW_score_input &inputs, std::vector<Metadata_index> &meta)
+void send_input_16s(dpu_set_t &dpu_set, NW_score_input &inputs, std::vector<ComparisonMetadata> &meta)
 {
 
     DPU_ASSERT(dpu_broadcast_to(dpu_set, "sequences", 0, inputs.sequences.data(), inputs.sequences.size(), DPU_XFER_ASYNC));
-    DPU_ASSERT(dpu_broadcast_to(dpu_set, "metadata", 0, &(inputs.metadata), sizeof(NW_dpu_metadata_input), DPU_XFER_ASYNC));
+    DPU_ASSERT(dpu_broadcast_to(dpu_set, "metadata", 0, &(inputs.metadata), sizeof(NwMetadataDPU), DPU_XFER_ASYNC));
 
     dpu_set_t dpu{};
     uint32_t each_dpu = 0;
@@ -362,10 +362,10 @@ void send_input_16s(dpu_set_t &dpu_set, NW_score_input &inputs, std::vector<Meta
         DPU_ASSERT(dpu_prepare_xfer(dpu, &(meta[each_dpu])));
     }
     DPU_ASSERT(dpu_push_xfer(dpu_set, DPU_XFER_TO_DPU, "meta_index", 0,
-                             sizeof(Metadata_index), DPU_XFER_ASYNC));
+                             sizeof(ComparisonMetadata), DPU_XFER_ASYNC));
 }
 
-void gather_output_16s(dpu_set_t &dpu_set, std::vector<NW_score_output> &outputs)
+void gather_output_16s(dpu_set_t &dpu_set, std::vector<NwScoreOutput> &outputs)
 {
     dpu_set_t dpu{};
     uint32_t each_dpu = 0;
@@ -375,10 +375,10 @@ void gather_output_16s(dpu_set_t &dpu_set, std::vector<NW_score_output> &outputs
         DPU_ASSERT(dpu_prepare_xfer(dpu, &outputs[each_dpu]));
     }
     DPU_ASSERT(dpu_push_xfer(dpu_set, DPU_XFER_FROM_DPU, "output", 0,
-                             sizeof(NW_score_output), DPU_XFER_ASYNC));
+                             sizeof(NwScoreOutput), DPU_XFER_ASYNC));
 }
 
-void update_meta(Metadata_index &meta, int &rest)
+void update_meta(ComparisonMetadata &meta, int &rest)
 {
     for (uint32_t i = 0; i < meta.count; i++)
     {
@@ -400,9 +400,9 @@ auto dispatch(const Set &set, size_t nr_dpu)
     auto mean = total_size / nr_dpu;
     int rest = static_cast<int>(total_size % nr_dpu);
 
-    std::vector<Metadata_index> dpu_metadata(nr_dpu);
+    std::vector<ComparisonMetadata> dpu_metadata(nr_dpu);
 
-    Metadata_index meta{
+    ComparisonMetadata meta{
         0,
         1,
         static_cast<uint32_t>(mean + (rest-- != 0 ? 1 : 0)),
@@ -429,7 +429,7 @@ std::vector<int> dpu_pipeline_16s(std::string dpu_bin_path, const NW_Parameters 
     send_input_16s(dpus, compressed_set, metadata);
     DPU_ASSERT(dpu_launch(dpus, DPU_ASYNCHRONOUS));
 
-    std::vector<NW_score_output> outputs(ndpu);
+    std::vector<NwScoreOutput> outputs(ndpu);
     gather_output_16s(dpus, outputs);
 
     std::vector<int> results_dpu{};

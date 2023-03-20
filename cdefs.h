@@ -50,7 +50,7 @@ typedef enum
  *  stack errors occurs.
  *
  */
-typedef struct NW_dpu_metadata_input
+typedef struct NwMetadataDPU
 {
     /// @brief Collection of all common data needed for N&W
     uint32_t indexes[DPU_MAX_NUMBER_OF_SEQUENCES];       /// index of Nth sequence in sequence buffer
@@ -62,20 +62,20 @@ typedef struct NW_dpu_metadata_input
     int32_t gap_opening;                                 /// gap opening score
     int32_t gap_extension;                               /// gap extension score
 
-} NW_dpu_metadata_input;
+} NwMetadataDPU;
 
 /**
  * @brief Represents the needed parameters to compute upper triangular comparison matrix
  *
  */
-typedef struct Metadata_index
+typedef struct ComparisonMetadata
 {
     /// @brief All against all needed values
     uint32_t start_row; /// Starting row for comparison matrix
     uint32_t start_col; /// Starting column for comparison matrix
     uint32_t count;     /// How many comparison to do
     uint32_t size;      /// Total number of sequence to compare (comparison matrix size)
-} Metadata_index;
+} ComparisonMetadata;
 
 /**
  * @brief Structure for data send back from DPU to host.
@@ -83,25 +83,25 @@ typedef struct Metadata_index
  * and lenght of all cigars. CIGARs are sent separatly.
  *
  */
-typedef struct NW_dpu_output
+typedef struct NwCigarOutput
 {
     /// @brief Relevant data
     uint64_t perf_counter;                           /// performance counter, cycle or instruction can be change on dpu code size.
     int32_t scores[METADATA_MAX_NUMBER_OF_SCORES];   /// score of pair alignment
     uint16_t lengths[METADATA_MAX_NUMBER_OF_SCORES]; /// length of CIGARs
-} NW_dpu_output;
+} NwCigarOutput;
 
 /**
  * @brief Structure for data send back from DPU to host.
  * Contains the perfcounter and score of each comparison.
  *
  */
-typedef struct NW_score_output
+typedef struct NwScoreOutput
 {
     /// @brief Relevant data
     int32_t scores[SCORE_METADATA_MAX_NUMBER_OF_SCORES]; /// score of comparison
     uint32_t nr_score;                                   /// number of comparison done
     uint64_t perf_counter;                               /// performance counter
-} NW_score_output;
+} NwScoreOutput;
 
 #endif /* EFB491BB_CE51_45FE_BB8B_8CD42179622B */

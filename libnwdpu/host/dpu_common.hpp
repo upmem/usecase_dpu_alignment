@@ -13,14 +13,14 @@
  */
 typedef struct NW_dpu_input
 {
-    NW_dpu_metadata_input metadata{};      /// metadata describing the sequences
+    NwMetadataDPU metadata{};      /// metadata describing the sequences
     CompressedSequences sequences{};       /// all sequences in one single buffer
     std::vector<uint32_t> cigar_indexes{}; /// start index of each cigar memory space
 } NW_dpu_input;
 
 typedef struct NW_score_input
 {
-    NW_dpu_metadata_input metadata{};
+    NwMetadataDPU metadata{};
     CompressedSequences sequences{};
 } NW_score_input;
 

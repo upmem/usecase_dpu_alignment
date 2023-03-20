@@ -41,8 +41,18 @@ struct NW_Parameters
     }
 };
 
+/**
+ * @brief CIGAR Representation
+ *
+ */
 struct Cigar : public std::string
 {
+    /**
+     * @brief Computes score of CIGAR
+     *
+     * @param params Bonus/Penalties to use for score computation
+     * @return Score
+     */
     int count_score(const NW_Parameters &params) const
     {
         int score = 0;
@@ -111,6 +121,12 @@ inline size_t count_unique_pair(const Sets &sets)
     return res;
 }
 
+/**
+ * @brief Estimate the number of cells to compute for given Set (assuming banded N&W)
+ *
+ * @param set
+ * @return Load estimation
+ */
 inline size_t count_compute_load(const Set &set)
 {
     size_t compute_load = 0;

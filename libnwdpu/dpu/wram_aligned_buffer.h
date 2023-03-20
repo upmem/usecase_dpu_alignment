@@ -11,7 +11,7 @@
 
 // max number of tasklets
 #ifndef NR_TASKLETS
-#define NR_TASKLETS (-1)
+#define NR_TASKLETS (24)
 #endif
 
 // if no NR_GROUPS is given, make one buffer per tasklet
