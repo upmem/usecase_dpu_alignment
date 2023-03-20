@@ -12,36 +12,23 @@
 #include "../cdefs.h"
 #include "timer.hpp"
 
-static constexpr size_t NB_NUCLEOTIDE = 5;
-
-using SimilarityMatrix = std::array<int8_t, NB_NUCLEOTIDE * NB_NUCLEOTIDE>;
-constexpr SimilarityMatrix make_similarity_matrix(int pM, int pX)
-{
-    int8_t M = static_cast<int8_t>(pM);
-    int8_t X = static_cast<int8_t>(pX);
-    return {
-        M, X, X, X, 0,
-        X, M, X, X, 0,
-        X, X, M, X, 0,
-        X, X, X, M, 0,
-        0, 0, 0, 0, 0};
-}
-
+/**
+ * @brief Needleman & Wunsch parameters
+ *
+ */
 struct NW_Parameters
 {
-    int match;
-    int mismatch;
-    int32_t gap_opening;
-    int32_t gap_extension;
-    int width;
-    SimilarityMatrix smat;
+    /// @brief Public parameters
+    int match;             /// match bonus
+    int mismatch;          /// mismatch penalty
+    int32_t gap_opening;   /// gap opening penalty
+    int32_t gap_extension; /// gap extension penalty
+    int width;             /// band width
 
-    NW_Parameters() = default;
-    NW_Parameters(const NW_Parameters &) = default;
-    NW_Parameters(NW_Parameters &&) = default;
-    NW_Parameters &operator=(const NW_Parameters &) = default;
-    NW_Parameters &operator=(NW_Parameters &&) = default;
-    ~NW_Parameters() = default;
+    /**
+     * @brief Print Needleman & Wunsch parameters
+     *
+     */
     void print() const
     {
         printf("Alignment parameters:\n"
@@ -51,20 +38,6 @@ struct NW_Parameters
                "  gap extension: %d\n"
                "  width:         %d\n\n",
                match, mismatch, gap_opening, gap_extension, width);
-    }
-
-    constexpr NW_Parameters(
-        int _match,
-        int _miss,
-        int32_t _gapo1,
-        int32_t _gape1,
-        int _width) : match(_match),
-                      mismatch(_miss),
-                      gap_opening(_gapo1),
-                      gap_extension(_gape1),
-                      width(_width),
-                      smat(make_similarity_matrix(_match, _miss))
-    {
     }
 };
 
@@ -113,8 +86,7 @@ struct nw_t
 /********** Set / Sequence **********/
 
 using Sequence = std::string;
-using Sequences = std::vector<Sequence>;
-using Set = Sequences;
+using Set = std::vector<Sequence>;
 using Sets = std::vector<Set>;
 using CompressedSequence = std::vector<uint8_t>;
 using CompressedSequences = std::vector<uint8_t>;
@@ -183,7 +155,7 @@ inline void encode_base(auto &S)
         encode_base(s);
 }
 
-inline Set encode_set(Set &S)
+inline Set encode_set(Set &&S)
 {
     for (auto &s : S)
         encode_base(s);
@@ -219,9 +191,10 @@ void dump_to_file(const std::filesystem::path &filename, const auto &Container, 
     std::exit(EXIT_FAILURE);
 }
 
+template <typename Container>
 static constexpr inline auto resize(size_t i)
 {
-    return [i](Sets &&s) -> Sets
+    return [i](Container &&s) -> Container
     {
         if (s.size() > i)
             s.resize(i);
@@ -229,13 +202,33 @@ static constexpr inline auto resize(size_t i)
     };
 }
 
-static inline auto print_size(const std::string &str)
+static inline auto print_sets_size(const std::string &str)
 {
     return [str](Sets &&sets)
     {
         printf(("  " + str + ": %lu\n").c_str(), sets.size());
         return sets;
     };
+}
+
+static inline auto print_set_size(const std::string &str)
+{
+    return [str](Set &&set)
+    {
+        printf(("  " + str + ": %lu\n").c_str(), set.size());
+        return set;
+    };
+}
+
+static inline auto sum_integers(auto i)
+{
+    static_assert(std::is_integral<decltype(i)>::value, "Integral type required !");
+    return i * (i - 1) / 2;
+}
+
+static inline size_t triangular_index(size_t i, size_t j, size_t n)
+{
+    return sum_integers(n) - sum_integers(n - i) + j - i - 1;
 }
 
 #endif /* AD18B383_F97E_4512_98DA_46CE2947ACDD */

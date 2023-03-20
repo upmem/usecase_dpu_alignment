@@ -36,15 +36,15 @@ int main()
            "  forcing width to 128.\n"
            "  using %u dpus.\n\n",
            ndpus);
-    nw_parameters.width = 128;
+
     nw_parameters.print();
 
     printf("Dataset:\n");
     Timer load_time{};
     auto dataset = read_set_fasta(home / dataset_path) |
-                   print_size("max") |
-                   resize(nsets) |
-                   print_size("use") |
+                   print_sets_size("max") |
+                   resize<Sets>(nsets) |
+                   print_sets_size("use") |
                    encode_sets;
     load_time.print("  ");
 
