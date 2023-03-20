@@ -119,7 +119,7 @@ static inline size_t add_dpu_load(const auto &set, auto &dpu_compute_load, size_
     return idx;
 }
 
-std::vector<NwInputCigar> fair_dispatch(const Sets &data, size_t nr_of_dpus, const NW_Parameters &p)
+std::vector<NwInputCigar> fair_dispatch(const Sets &data, size_t nr_of_dpus, const NwParameters &p)
 {
     printf("\nDispatch:\n");
     std::vector<NwInputCigar> dpu_input(nr_of_dpus);
@@ -291,7 +291,7 @@ dpu_set_t init_dpu(const std::filesystem::path &filename, size_t count)
     return dpus;
 }
 
-std::vector<nw_t> dpu_pipeline(std::string dpu_bin_path, const NW_Parameters &p, size_t nr_dpu, const Sets &sets)
+std::vector<nw_t> dpu_cigar_pipeline(std::string dpu_bin_path, const NwParameters &p, size_t nr_dpu, const Sets &sets)
 {
     Timer dispatch_time{};
     auto dpu_inputs = fair_dispatch(sets, nr_dpu, p);
@@ -315,7 +315,7 @@ std::vector<nw_t> dpu_pipeline(std::string dpu_bin_path, const NW_Parameters &p,
     return dpu_to_cpu_format(sets, dpu_inputs, dpu_outputs, dpu_cigars);
 }
 
-auto Set_to_dpuSet(const Set &data, const NW_Parameters &params)
+auto Set_to_dpuSet(const Set &data, const NwParameters &params)
 {
     NwInputScore dpu_input;
 
@@ -417,7 +417,7 @@ auto dispatch(const Set &set, size_t nr_dpu)
     return dpu_metadata;
 }
 
-std::vector<int> dpu_pipeline_16s(std::string dpu_bin_path, const NW_Parameters &params, size_t ndpu, const Set &set)
+std::vector<int> dpu_16s_pipeline(std::string dpu_bin_path, const NwParameters &params, size_t ndpu, const Set &set)
 {
     auto metadata = dispatch(set, ndpu);
     auto compressed_set = Set_to_dpuSet(set, params);

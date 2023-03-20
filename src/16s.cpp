@@ -14,17 +14,18 @@ auto read_parameters(const std::filesystem::path &filename)
     auto config = YAML::LoadFile(filename.native());
     auto dataset = config["dataset"].as<std::string>();
     auto dpus_number = config["dpus_number"].as<uint32_t>();
+    auto params = config["nw_params"];
 
     const auto home = std::filesystem::canonical("/proc/self/exe").parent_path();
 
-    NW_Parameters nwp(
-        config["nw_params"]["match"].as<int>(),
-        config["nw_params"]["mismatch"].as<int>(),
-        config["nw_params"]["gap_opening"].as<int>(),
-        config["nw_params"]["gap_extension"].as<int>(),
-        config["nw_params"]["width"].as<int>());
-
-    return std::tuple{home / dataset, nwp, dpus_number};
+    return std::tuple{
+        home / dataset,
+        NwParameters{params["match"].as<int32_t>(),
+                     params["mismatch"].as<int32_t>(),
+                     params["gap_opening"].as<int32_t>(),
+                     params["gap_extension"].as<int32_t>(),
+                     128},
+        dpus_number};
 }
 
 int main()
@@ -35,7 +36,6 @@ int main()
            "  forcing width to 128.\n"
            "  using %u dpus.\n\n",
            ndpu);
-    params.width = 128;
     params.print();
 
     printf("Dataset:\n");
@@ -44,7 +44,7 @@ int main()
                    encode_set;
 
     Timer compute_time{};
-    auto alignments = dpu_pipeline_16s("./libnwdpu/dpu/nw_16s", params, ndpu, dataset);
+    auto alignments = dpu_16s_pipeline("./libnwdpu/dpu/nw_16s", params, ndpu, dataset);
     compute_time.print("  ");
 
     dump_to_file("scores.txt", alignments, [](const auto &e)

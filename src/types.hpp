@@ -16,14 +16,14 @@
  * @brief Needleman & Wunsch parameters
  *
  */
-struct NW_Parameters
+struct NwParameters
 {
     /// @brief Public parameters
-    int match;             /// match bonus
-    int mismatch;          /// mismatch penalty
+    int32_t match;         /// match bonus
+    int32_t mismatch;      /// mismatch penalty
     int32_t gap_opening;   /// gap opening penalty
     int32_t gap_extension; /// gap extension penalty
-    int width;             /// band width
+    int32_t width;         /// band width
 
     /**
      * @brief Print Needleman & Wunsch parameters
@@ -53,7 +53,7 @@ struct Cigar : public std::string
      * @param params Bonus/Penalties to use for score computation
      * @return Score
      */
-    int count_score(const NW_Parameters &params) const
+    int count_score(const NwParameters &params) const
     {
         int score = 0;
         int gap = 0;

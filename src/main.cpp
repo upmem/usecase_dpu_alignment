@@ -19,10 +19,11 @@ auto read_parameters(const std::filesystem::path &filename)
     return std::tuple{
         path,
         sets_number,
-        NW_Parameters{params["match"].as<int>(),
-                      params["mismatch"].as<int>(),
-                      params["gap_opening"].as<int>(),
-                      params["gap_extension"].as<int>(), 128},
+        NwParameters{params["match"].as<int32_t>(),
+                     params["mismatch"].as<int32_t>(),
+                     params["gap_opening"].as<int32_t>(),
+                     params["gap_extension"].as<int32_t>(),
+                     128},
         dpus_number};
 }
 
@@ -36,7 +37,6 @@ int main()
            "  forcing width to 128.\n"
            "  using %u dpus.\n\n",
            ndpus);
-
     nw_parameters.print();
 
     printf("Dataset:\n");
@@ -49,7 +49,7 @@ int main()
     load_time.print("  ");
 
     Timer compute_time{};
-    auto alignments = dpu_pipeline("./libnwdpu/dpu/nw_affine", nw_parameters, ndpus, dataset);
+    auto alignments = dpu_cigar_pipeline("./libnwdpu/dpu/nw_affine", nw_parameters, ndpus, dataset);
     compute_time.print("  ");
 
     dump_to_file("scores.txt", alignments, [](const auto &e)

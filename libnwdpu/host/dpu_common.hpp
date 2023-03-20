@@ -8,23 +8,48 @@
 #include "../../src/types.hpp"
 
 /**
- * @brief Structure regrouping all data to be send to a dpu
+ * @brief Structure regrouping all data to be send to a dpu for Cigar
  *
  */
 typedef struct NwInputCigar
 {
+    /// @brief Input data for Cigar NW
     NwMetadataDPU metadata{};              /// metadata describing the sequences
-    CompressedSequences sequences{};       /// all sequences in one single buffer
+    CompressedSequences sequences{};       /// all sequences in are compressed into one single buffer
     std::vector<uint32_t> cigar_indexes{}; /// start index of each cigar memory space
 } NwInputCigar;
 
+/**
+ * @brief Structure regrouping all data to be send to a dpu for Score
+ *
+ */
 typedef struct NwInputScore
 {
-    NwMetadataDPU metadata{};
-    CompressedSequences sequences{};
+    /// @brief Input data for Score NW
+    NwMetadataDPU metadata{};        /// metadata describing the sequences
+    CompressedSequences sequences{}; /// all sequences in are compressed into one single buffer
 } NwInputScore;
 
-std::vector<nw_t> dpu_pipeline(std::string dpu_bin_path, const NW_Parameters &p, size_t nr_dpu, const Sets &sets);
-std::vector<int> dpu_pipeline_16s(std::string dpu_bin_path, const NW_Parameters &params, size_t ndpu, const Set &set);
+/**
+ * @brief DPU pipeline for CIGAR
+ *
+ * @param dpu_bin_path DPU binary path
+ * @param params NW parameters
+ * @param nr_dpu Number of dpu to use
+ * @param sets Dataset
+ * @return std::vector<nw_t>
+ */
+std::vector<nw_t> dpu_cigar_pipeline(std::string dpu_bin_path, const NwParameters &params, size_t nr_dpu, const Sets &sets);
+
+/**
+ * @brief DPU pipeline for score
+ *
+ * @param dpu_bin_path DPU binary path
+ * @param params NW parameters
+ * @param ndpu Number of dpu to use
+ * @param set Dataset
+ * @return std::vector<int>
+ */
+std::vector<int> dpu_16s_pipeline(std::string dpu_bin_path, const NwParameters &params, size_t ndpu, const Set &set);
 
 #endif /* E6039E80_5D9F_462C_ACAE_D977B65797AC */
