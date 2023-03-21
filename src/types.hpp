@@ -174,6 +174,13 @@ constexpr inline auto operator|(T &&t, F f)
     return f(std::forward<T>(t));
 }
 
+/**
+ * @brief Dump all the element from a container to a file. Accessor applied on element.
+ *
+ * @param filename
+ * @param Container
+ * @param Accessor
+ */
 void dump_to_file(const std::filesystem::path &filename, const auto &Container, const auto &Accessor)
 {
     std::ofstream file(filename);
@@ -184,12 +191,24 @@ void dump_to_file(const std::filesystem::path &filename, const auto &Container, 
         file << Accessor(e) << '\n';
 }
 
+/**
+ * @brief Exit the program after printing a given error message
+ *
+ * @param message
+ */
 [[noreturn]] static inline void exit(std::string message)
 {
     printf("%s\n", message.c_str());
     std::exit(EXIT_FAILURE);
 }
 
+/**
+ * @brief Resize a container to a smaller size, nothing is done if size greater than current size.
+ *
+ * @tparam Container
+ * @param i
+ * @return constexpr auto
+ */
 template <typename Container>
 static constexpr inline auto resize(size_t i)
 {
@@ -201,12 +220,19 @@ static constexpr inline auto resize(size_t i)
     };
 }
 
+/**
+ * @brief Return a ffunction printing the size of container with given string prefixed
+ *
+ * @tparam C
+ * @param str
+ * @return auto
+ */
 template <typename C>
 static inline auto print_size(const std::string &str)
 {
     return [str](C &&container)
     {
-        printf(("  " + str + ": %lu\n").c_str(), container.size());
+        printf((str + "%lu\n").c_str(), container.size());
         return container;
     };
 }

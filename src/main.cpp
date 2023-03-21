@@ -42,9 +42,9 @@ int main()
     printf("Dataset:\n");
     Timer load_time{};
     auto dataset = read_set_fasta(home / dataset_path) |
-                   print_size<Sets>("max") |
+                   print_size<Sets>("  max: ") |
                    resize<Sets>(nsets) |
-                   print_size<Sets>("use") |
+                   print_size<Sets>("  use: ") |
                    encode<Sets>;
     load_time.print("  ");
 
