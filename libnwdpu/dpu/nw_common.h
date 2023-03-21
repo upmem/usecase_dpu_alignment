@@ -116,8 +116,8 @@ static inline void shift_right_s(int32_t *vec)
     for (int i = 62; i >= 0; i--)
     {
         register uint64_t val = p[i];
-        vec[i * 2 + 2] = val >> 32;
-        vec[i * 2 + 1] = val;
+        vec[i * 2 + 1] = (int32_t)(val);
+        vec[i * 2 + 2] = (int32_t)(val >> 32);
     }
 }
 
@@ -135,8 +135,8 @@ static inline void shift_left_s(int32_t *vec)
     for (int i = 1; i < 64; i++)
     {
         register uint64_t val = p[i];
-        vec[i * 2] = val >> 32;
-        vec[i * 2 - 1] = val;
+        vec[i * 2] = (int32_t)(val >> 32);
+        vec[i * 2 - 1] = (int32_t)val;
     }
 }
 
