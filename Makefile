@@ -9,18 +9,27 @@ ifeq "${GCCVERSION}" "8"
 	LDFLAGS += -lstdc++fs
 endif
 
-NW := dpu_alignment
+NW := dpu_sets
+NW16S := dpu_16S
 
-.PHONY: all clean
+.PHONY: all clean 16s
 
-all: ${NW}
+all: ${NW} ${NW16S}
+
+16s: ${NW16S}
 
 clean:
 	$(RM) ${NW}
+	$(RM) ${NW16S}
 	cd ./libnwdpu/dpu && make clean
 
-SRC := ./src/main.cpp ./src/fasta.cpp ./libnwdpu/host/dpu_common.cpp
+SRC := ./src/main_sets.cpp ./src/fasta.cpp ./libnwdpu/host/dpu_common.cpp
+SRC16S := ./src/main_16s.cpp ./src/fasta.cpp ./libnwdpu/host/dpu_common.cpp
 
 ${NW}: ${SRC}
 	${CXX} ${FLAGS} $^ -o $@ ${LDFLAGS} `dpu-pkg-config --cflags --libs dpu`
-	cd ./libnwdpu/dpu && make clean && make affine
+	cd ./libnwdpu/dpu && make affine
+
+${NW16S}: ${SRC16S}
+	${CXX} ${FLAGS} $^ -o $@ ${LDFLAGS} `dpu-pkg-config --cflags --libs dpu`
+	cd ./libnwdpu/dpu && make 16s
