@@ -45,7 +45,7 @@ int main()
                    print_sets_size("max") |
                    resize<Sets>(nsets) |
                    print_sets_size("use") |
-                   encode_sets;
+                   encode<Sets>;
     load_time.print("  ");
 
     Timer compute_time{};

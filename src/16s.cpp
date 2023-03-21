@@ -41,7 +41,7 @@ int main()
     printf("Dataset:\n");
     auto dataset = read_seq_fasta(dataset_path) |
                    print_set_size("size") |
-                   encode_set;
+                   encode<Set>;
 
     Timer compute_time{};
     auto alignments = dpu_16s_pipeline("./libnwdpu/dpu/nw_16s", params, ndpu, dataset);

@@ -254,9 +254,9 @@ void gather_cigar_output(dpu_set_t &dpu_set, std::vector<NwCigarOutput> &outputs
                              MAX_CIGAR_SIZE, DPU_XFER_ASYNC));
 }
 
-std::vector<nw_t> dpu_to_cpu_format(const auto &sets, const auto &inputs, const auto &outputs, const auto &cigars)
+std::vector<NwType> dpu_to_cpu_format(const auto &sets, const auto &inputs, const auto &outputs, const auto &cigars)
 {
-    std::vector<nw_t> cpu_output(count_unique_pair(sets));
+    std::vector<NwType> cpu_output(count_unique_pair(sets));
 
     auto comb = [](auto n)
     { return n * (n - 1) / 2; };
@@ -291,7 +291,7 @@ dpu_set_t init_dpu(const std::filesystem::path &filename, size_t count)
     return dpus;
 }
 
-std::vector<nw_t> dpu_cigar_pipeline(std::string dpu_bin_path, const NwParameters &p, size_t nr_dpu, const Sets &sets)
+std::vector<NwType> dpu_cigar_pipeline(std::string dpu_bin_path, const NwParameters &p, size_t nr_dpu, const Sets &sets)
 {
     Timer dispatch_time{};
     auto dpu_inputs = fair_dispatch(sets, nr_dpu, p);

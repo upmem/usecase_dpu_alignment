@@ -77,20 +77,15 @@ struct Cigar : public std::string
 
 using Cigars = std::vector<Cigar>;
 
-struct nw_t
+/**
+ * @brief Type for Needleman & Wunsch return values
+ *
+ */
+struct NwType
 {
-    int score{};
-    Cigar cigar{};
-    bool zdropped = false;
-
-    nw_t() = default;
-    explicit nw_t(const nw_t &nw) = default;
-    explicit nw_t(nw_t &&nw) = default;
-    nw_t &operator=(const nw_t &nw) = default;
-    nw_t &operator=(nw_t &&nw) = default;
-    ~nw_t() = default;
-
-    nw_t(int s, const Cigar &c) : score(s), cigar(c) {}
+    /// @brief Aggregate data
+    int score{};   /// Score from alignment
+    Cigar cigar{}; /// CIGAR of the alignment
 };
 
 /********** Set / Sequence **********/
@@ -149,40 +144,28 @@ inline size_t count_compute_load(const Sets &sets)
 /********** nucleotide to ksw2 encoding **********/
 
 /**
- * @brief Encode from ACTG/actg to 0123, undefined outside good values
+ * @brief Encode from ACTG/actg to 0123, undefined for other values
  *
  * @param c nucleotide
  */
-constexpr inline void encode_base(char &c)
+template <typename C>
+constexpr inline C &encode(C &&c)
 {
-    c >>= 1;
-    constexpr uint8_t mask = 0b11;
-    c &= mask;
-}
+    if constexpr (std::is_same<char, std::remove_reference_t<C>>::value)
+    {
+        c >>= 1;
+        constexpr uint8_t mask = 0b11;
+        c &= mask;
 
-/**
- * @brief Encode from ACTG to 0123 all element in collections.
- *
- * @param S
- */
-inline void encode_base(auto &S)
-{
-    for (auto &s : S)
-        encode_base(s);
-}
+        return c;
+    }
+    else
+    {
+        for (auto &e : c)
+            encode(e);
 
-inline Set encode_set(Set &&S)
-{
-    for (auto &s : S)
-        encode_base(s);
-    return S;
-}
-
-inline Sets encode_sets(Sets &&S)
-{
-    for (auto &s : S)
-        encode_base(s);
-    return S;
+        return c;
+    }
 }
 
 template <typename T, typename F>

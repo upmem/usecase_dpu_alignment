@@ -37,9 +37,9 @@ typedef struct NwInputScore
  * @param params NW parameters
  * @param nr_dpu Number of dpu to use
  * @param sets Dataset
- * @return std::vector<nw_t>
+ * @return std::vector<NwType>
  */
-std::vector<nw_t> dpu_cigar_pipeline(std::string dpu_bin_path, const NwParameters &params, size_t nr_dpu, const Sets &sets);
+std::vector<NwType> dpu_cigar_pipeline(std::string dpu_bin_path, const NwParameters &params, size_t nr_dpu, const Sets &sets);
 
 /**
  * @brief DPU pipeline for score
