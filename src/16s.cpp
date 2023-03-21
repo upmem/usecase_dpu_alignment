@@ -40,7 +40,7 @@ int main()
 
     printf("Dataset:\n");
     auto dataset = read_seq_fasta(dataset_path) |
-                   print_set_size("size") |
+                   print_size<Set>("size") |
                    encode<Set>;
 
     Timer compute_time{};

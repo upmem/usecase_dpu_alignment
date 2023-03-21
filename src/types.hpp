@@ -201,21 +201,13 @@ static constexpr inline auto resize(size_t i)
     };
 }
 
-static inline auto print_sets_size(const std::string &str)
+template <typename C>
+static inline auto print_size(const std::string &str)
 {
-    return [str](Sets &&sets)
+    return [str](C &&container)
     {
-        printf(("  " + str + ": %lu\n").c_str(), sets.size());
-        return sets;
-    };
-}
-
-static inline auto print_set_size(const std::string &str)
-{
-    return [str](Set &&set)
-    {
-        printf(("  " + str + ": %lu\n").c_str(), set.size());
-        return set;
+        printf(("  " + str + ": %lu\n").c_str(), container.size());
+        return container;
     };
 }
 
