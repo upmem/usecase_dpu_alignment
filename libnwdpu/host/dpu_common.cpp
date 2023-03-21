@@ -295,7 +295,7 @@ std::vector<NwType> dpu_cigar_pipeline(std::string dpu_bin_path, const NwParamet
 {
     Timer dispatch_time{};
     auto dpu_inputs = fair_dispatch(sets, nr_dpu, p);
-    dispatch_time.print("  ");
+    dispatch_time.Print("  ");
 
     std::vector<NwCigarOutput> dpu_outputs(nr_dpu);
     std::vector<std::vector<char>> dpu_cigars(nr_dpu);
