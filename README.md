@@ -1,8 +1,10 @@
 # Needleman and Wunsch on DPU
 
 This repository implements two different alignment workload on UPMEM PiM.
+
 The first one named dpu_alignment compares sets of sequences with all sequences in the same set being compared with all the other in the same set.
-The second one named dpu_16s is an exemple of comparing a database of 16S RNA, all against all comparison.
+
+The second one named dpu_16s is an exemple of comparing a database of 16S RNA, all against all comparison. This can be use for more than just 16S RNA sequences.
 
 ## Libraries needed
 
@@ -52,4 +54,4 @@ All sequences with same number will be pair-aligned, same set number sequences m
 .
 .
 ```
-
+Limited to 1024 sequences for now !
