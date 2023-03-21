@@ -36,7 +36,7 @@ int main()
            "  forcing width to 128.\n"
            "  using %u dpus.\n\n",
            ndpu);
-    params.print();
+    params.Print();
 
     printf("Dataset:\n");
     auto dataset = read_seq_fasta(dataset_path) |

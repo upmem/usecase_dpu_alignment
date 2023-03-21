@@ -37,7 +37,7 @@ int main()
            "  forcing width to 128.\n"
            "  using %u dpus.\n\n",
            ndpus);
-    nw_parameters.print();
+    nw_parameters.Print();
 
     printf("Dataset:\n");
     Timer load_time{};
