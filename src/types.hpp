@@ -29,7 +29,7 @@ struct NwParameters
      * @brief Print Needleman & Wunsch parameters
      *
      */
-    void print() const
+    void Print() const
     {
         printf("Alignment parameters:\n"
                "  match:         %d\n"
@@ -53,7 +53,7 @@ struct Cigar : public std::string
      * @param params Bonus/Penalties to use for score computation
      * @return Score
      */
-    int count_score(const NwParameters &params) const
+    int CountScore(const NwParameters &params) const
     {
         int score = 0;
         int gap = 0;
@@ -75,6 +75,7 @@ struct Cigar : public std::string
     }
 };
 
+/// @brief Type for a collection of CIGARs
 using Cigars = std::vector<Cigar>;
 
 /**
@@ -90,15 +91,15 @@ struct NwType
 
 /********** Set / Sequence **********/
 
-using Sequence = std::string;
-using Set = std::vector<Sequence>;
-using Sets = std::vector<Set>;
-using CompressedSequence = std::vector<uint8_t>;
-using CompressedSequences = std::vector<uint8_t>;
-using CompressedSet = std::vector<CompressedSequence>;
+using Sequence = std::string;                          /// Sequence type
+using Set = std::vector<Sequence>;                     /// Set type
+using Sets = std::vector<Set>;                         /// Sets type
+using CompressedSequence = std::vector<uint8_t>;       /// Compressed sequence type
+using CompressedSequences = std::vector<uint8_t>;      /// Compressed sequences type
+using CompressedSet = std::vector<CompressedSequence>; /// Compressed set type
 
 /**
- * @brief Returns number of unique pair that can be made from set of sequences.
+ * @brief Returns number of unique pair that can be made from a set.
  *
  * @param set set of sequence to pair
  * @return size_t
@@ -108,6 +109,12 @@ inline size_t count_unique_pair(const Set &set)
     return (set.size() * (set.size() - 1)) / 2;
 }
 
+/**
+ * @brief Returns the total number of unique pairs in a collection of set
+ *
+ * @param sets
+ * @return size_t
+ */
 inline size_t count_unique_pair(const Sets &sets)
 {
     size_t res = 0;
@@ -132,6 +139,12 @@ inline size_t count_compute_load(const Set &set)
     return compute_load;
 }
 
+/**
+ * @brief Estimate the total compute load of a collection of Set.
+ *
+ * @param sets
+ * @return size_t
+ */
 inline size_t count_compute_load(const Sets &sets)
 {
     size_t compute_load = 0;
@@ -168,6 +181,15 @@ constexpr inline C &encode(C &&c)
     }
 }
 
+/**
+ * @brief A small helper operator to chain operations
+ *
+ * @tparam T
+ * @tparam F
+ * @param t Data to apply the function on
+ * @param f Next function to apply to t
+ * @return constexpr auto
+ */
 template <typename T, typename F>
 constexpr inline auto operator|(T &&t, F f)
 {
@@ -237,12 +259,26 @@ static inline auto print_size(const std::string &str)
     };
 }
 
+/**
+ * @brief Sum of the first i numbers, starting at 0.
+ *
+ * @param i
+ * @return auto
+ */
 static inline auto sum_integers(auto i)
 {
     static_assert(std::is_integral<decltype(i)>::value, "Integral type required !");
     return i * (i - 1) / 2;
 }
 
+/**
+ * @brief Gives the index in a linear buffer of an upper triangular matrix index
+ *
+ * @param i i th row
+ * @param j j th column
+ * @param n matrix size
+ * @return size_t
+ */
 static inline size_t triangular_index(size_t i, size_t j, size_t n)
 {
     return sum_integers(n) - sum_integers(n - i) + j - i - 1;
