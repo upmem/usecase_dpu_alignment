@@ -46,11 +46,11 @@ int main()
                    resize<Sets>(nsets) |
                    print_size<Sets>("  use: ") |
                    encode<Sets>;
-    load_time.print("  ");
+    load_time.Print("  ");
 
     Timer compute_time{};
     auto alignments = dpu_cigar_pipeline("./libnwdpu/dpu/nw_affine", nw_parameters, ndpus, dataset);
-    compute_time.print("  ");
+    compute_time.Print("  ");
 
     dump_to_file("scores.txt", alignments, [](const auto &e)
                  { return e.score; });

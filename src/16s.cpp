@@ -45,7 +45,7 @@ int main()
 
     Timer compute_time{};
     auto alignments = dpu_16s_pipeline("./libnwdpu/dpu/nw_16s", params, ndpu, dataset);
-    compute_time.print("  ");
+    compute_time.Print("  ");
 
     dump_to_file("scores.txt", alignments, [](const auto &e)
                  { return e; });
