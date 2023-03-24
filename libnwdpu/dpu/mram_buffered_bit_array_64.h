@@ -15,7 +15,7 @@ typedef struct mram_buffered_bit_array_64
     bool written;
 } __attribute__((aligned(8))) mram_buffered_bit_array_64;
 
-static inline mram_buffered_bit_array_64 get_mram_buffered_bit_array_64(wram_aligned_buffer_64 *buffer, __mram_ptr uint8_t *mram_ptr)
+static inline mram_buffered_bit_array_64 get_mram_buffered_bit_array_64(WramAligned64 *buffer, __mram_ptr uint8_t *mram_ptr)
 {
     mram_buffered_bit_array_64 array = {mram_ptr, UINT32_MAX, (uint8_t *)buffer + (64LU * me()), false};
     return array;

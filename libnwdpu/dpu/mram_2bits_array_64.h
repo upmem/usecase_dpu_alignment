@@ -15,7 +15,7 @@ typedef struct mram_2bits_array_64
     bool written;
 } __attribute__((aligned(8))) mram_2bits_array_64;
 
-static inline mram_2bits_array_64 create_mram_2bits_array_64(wram_aligned_buffer_64 *buffer, __mram_ptr uint8_t *mram_ptr, uint32_t id)
+static inline mram_2bits_array_64 create_mram_2bits_array_64(WramAligned64 *buffer, __mram_ptr uint8_t *mram_ptr, uint32_t id)
 {
     mram_2bits_array_64 array = {mram_ptr, UINT32_MAX, &buffer->buffer[64LU * id], false};
     return array;

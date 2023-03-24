@@ -26,7 +26,8 @@ typedef struct NwInputCigar
 typedef struct NwInputScore
 {
     /// @brief Input data for Score NW
-    NwMetadataDPU metadata{};        /// metadata describing the sequences
+    NwMetadataDPU metadata{}; /// metadata describing the sequences
+    NwSequenceMetadataMram sequence_metadata{};
     CompressedSequences sequences{}; /// all sequences in are compressed into one single buffer
 } NwInputScore;
 

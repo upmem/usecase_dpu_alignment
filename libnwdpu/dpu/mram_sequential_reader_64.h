@@ -11,11 +11,15 @@
 //          64
 ///////////////////////////////
 
-typedef struct mram_sequential_reader_64
+struct MramSeqReader
 {
-    uint8_t *current;
-    __mram_ptr uint8_t *mram_ptr;
-} __attribute__((aligned(8))) mram_sequential_reader_64;
+    /// @brief Data for the sequential reader
+    uint8_t *current;             /// pointer in the aligned buffer
+    __mram_ptr uint8_t *mram_ptr; /// pointer to the current 64 block of MRAM in the buffer
+} /// Hoping the compiler can see the double load one day !
+__attribute__((aligned(8)));
+
+typedef struct MramSeqReader MramSeqReader;
 
 /**
  * @brief Get the mram sequential reader 64 object
@@ -23,11 +27,11 @@ typedef struct mram_sequential_reader_64
  * @param mseq pointer to wram aligned buffer group aware
  * @param mram_ptr pointer to MRAM start of sequence
  * @param id group id
- * @return mram_sequential_reader_64
+ * @return MramSeqReader
  */
-static inline mram_sequential_reader_64 get_mram_sequential_reader_64(wram_aligned_buffer_64 *mseq, __mram_ptr uint8_t *mram_ptr, uint32_t id)
+static inline MramSeqReader get_mram_sequential_reader_64(WramAligned64 *mseq, __mram_ptr uint8_t *mram_ptr, uint32_t id)
 {
-    mram_sequential_reader_64 reader = {mseq->buffer + (64 * id) + 63, mram_ptr - 64};
+    MramSeqReader reader = {mseq->buffer + (64 * id) + 63, mram_ptr - 64};
     return reader;
 }
 
@@ -37,7 +41,7 @@ static inline mram_sequential_reader_64 get_mram_sequential_reader_64(wram_align
  * @param mseq
  * @return uint8_t*
  */
-static inline uint8_t *mram_sequential_reader_64_next(mram_sequential_reader_64 *mseq)
+static inline uint8_t *mram_sequential_reader_64_next(MramSeqReader *mseq)
 {
     __asm__ volatile(
         "add %[cur], %[cur], 1, nc6, 64f;"

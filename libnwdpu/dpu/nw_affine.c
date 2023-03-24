@@ -24,14 +24,14 @@ __host NwCigarOutput output;
 __mram uint8_t cigars[MAX_CIGAR_SIZE];
 __mram uint32_t cigar_indexes[METADATA_MAX_NUMBER_OF_SCORES];
 
-wram_aligned_buffer_64 dna_reader_buffer1;
-wram_aligned_buffer_64 dna_reader_buffer2;
+WramAligned64 dna_reader_buffer1;
+WramAligned64 dna_reader_buffer2;
 
-wram_aligned_buffer_32 direction_buffer;
-wram_aligned_buffer_32 trace_wram_buffer;
+WramAligned32 direction_buffer;
+WramAligned32 trace_wram_buffer;
 
-wram_aligned_buffer_32 t_e_wram_buffer;
-wram_aligned_buffer_32 t_f_wram_buffer;
+WramAligned32 t_e_wram_buffer;
+WramAligned32 t_f_wram_buffer;
 
 __dma_aligned uint8_t buf_av[NR_GROUPS][W_MAX];
 __dma_aligned uint8_t buf_bv[NR_GROUPS][W_MAX];
@@ -52,11 +52,11 @@ void align_initialisations()
 
   align_data[pool_id].l1 = metadata.lengths[align_data[pool_id].s1];
   align_data[pool_id].av = buf_av[pool_id];
-  align_data[pool_id].i = init_dna1();
+  align_data[pool_id].i = init_dna1(&sequences[metadata.indexes[align_data[pool_id].s1]]);
 
   align_data[pool_id].l2 = metadata.lengths[align_data[pool_id].s2];
   align_data[pool_id].bv = buf_bv[pool_id];
-  align_data[pool_id].j = init_dna2();
+  align_data[pool_id].j = init_dna2(&sequences[metadata.indexes[align_data[pool_id].s2]]);
 
   init_pv();
   init_ppv();

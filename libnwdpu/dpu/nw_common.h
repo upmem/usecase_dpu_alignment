@@ -60,8 +60,8 @@ __mram uint8_t trace_buffer[NR_GROUPS][40000 / 2 * W_MAX]; /// 2 * 40000 seq on 
 __mram uint8_t te_buffer[NR_GROUPS][40000 / 4 * W_MAX];    /// 2 * 40000 seq on 1bit
 __mram uint8_t tf_buffer[NR_GROUPS][40000 / 4 * W_MAX];    /// 2 * 40000 seq on 1bit
 __mram uint8_t sequences[SCORE_MAX_SEQUENCES_TOTAL_SIZE];
-wram_aligned_buffer_64 dna_reader_buffer1;
-wram_aligned_buffer_64 dna_reader_buffer2;
+WramAligned64 dna_reader_buffer1;
+WramAligned64 dna_reader_buffer2;
 
 extern NwMetadataDPU metadata;
 
@@ -215,13 +215,13 @@ static void init_fv()
     fv[(W_MAX / 2)] = -gapoe;
 }
 
-static uint32_t init_dna1()
+static uint32_t init_dna1(__mram_ptr uint8_t *index)
 {
     const uint32_t pool_id = group();
 
     align_data[pool_id].dna1 = get_dna_reader(
         &dna_reader_buffer1,
-        &sequences[metadata.indexes[align_data[pool_id].s1]],
+        index,
         pool_id);
 
     int w2 = (W_MAX >> 1);
@@ -242,14 +242,14 @@ static uint32_t init_dna1()
     return i;
 }
 
-static uint32_t init_dna2()
+static uint32_t init_dna2(__mram_ptr uint8_t *index)
 {
     const uint32_t pool_id = group();
     int w2 = (W_MAX >> 1);
 
     align_data[pool_id].dna2 = get_dna_reader(
         &dna_reader_buffer2,
-        &sequences[metadata.indexes[align_data[pool_id].s2]],
+        index,
         pool_id);
 
     dna_reader *reader = &align_data[pool_id].dna2;

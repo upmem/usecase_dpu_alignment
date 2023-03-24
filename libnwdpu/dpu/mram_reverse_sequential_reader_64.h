@@ -17,7 +17,7 @@ typedef struct mram_reverse_sequential_reader_64
     __mram_ptr uint8_t *mram_ptr;
 } __attribute__((aligned(8))) mram_reverse_sequential_reader_64;
 
-static inline mram_reverse_sequential_reader_64 get_mram_reverse_sequential_reader_64(wram_aligned_buffer_64 *buf, __mram_ptr uint8_t *mram_ptr)
+static inline mram_reverse_sequential_reader_64 get_mram_reverse_sequential_reader_64(WramAligned64 *buf, __mram_ptr uint8_t *mram_ptr)
 {
     uintptr_t offset = (uintptr_t)mram_ptr & 0x3F;
     mram_ptr = (__mram_ptr uint8_t *)((uintptr_t)mram_ptr & 0xFFFFFFC0);

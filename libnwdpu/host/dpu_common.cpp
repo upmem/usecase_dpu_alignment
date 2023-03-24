@@ -332,9 +332,9 @@ auto Set_to_dpuSet(const Set &data, const NwParameters &params)
 
     for (size_t i = 0; i < cset.size(); i++)
     {
-        assert(seq_id < 1024 && "Set is too big!\n");
-        dpu_input.metadata.lengths[seq_id] = data[i].size();
-        dpu_input.metadata.indexes[seq_id] = dpu_index;
+        assert(seq_id < DPU_MAX_NUMBER_OF_SEQUENCES_MRAM && "Set is too big!\n");
+        dpu_input.sequence_metadata.lengths[seq_id] = data[i].size();
+        dpu_input.sequence_metadata.indexes[seq_id] = dpu_index;
         dpu_index += cset[i].size();
         seq_id++;
     }
@@ -353,6 +353,7 @@ void send_input_16s(dpu_set_t &dpu_set, NwInputScore &inputs, std::vector<Compar
 
     DPU_ASSERT(dpu_broadcast_to(dpu_set, "sequences", 0, inputs.sequences.data(), inputs.sequences.size(), DPU_XFER_ASYNC));
     DPU_ASSERT(dpu_broadcast_to(dpu_set, "metadata", 0, &(inputs.metadata), sizeof(NwMetadataDPU), DPU_XFER_ASYNC));
+    DPU_ASSERT(dpu_broadcast_to(dpu_set, "sequence_metadata", 0, &(inputs.sequence_metadata), sizeof(NwSequenceMetadataMram), DPU_XFER_ASYNC));
 
     dpu_set_t dpu{};
     uint32_t each_dpu = 0;
@@ -402,6 +403,8 @@ auto dispatch(const Set &set, size_t nr_dpu)
 
     std::vector<ComparisonMetadata> dpu_metadata(nr_dpu);
 
+    printf("  mean: %lu\n", mean);
+
     ComparisonMetadata meta{
         0,
         1,
@@ -441,7 +444,8 @@ std::vector<int> dpu_16s_pipeline(std::string dpu_bin_path, const NwParameters &
             results_dpu.push_back(dpu.scores[i]);
 
     // Add to dump DPU counters and analyse their individual workload.
-    // dump_to_file("counters.txt", outputs, [](const auto &e) { return e.perf_counter; });
+    dump_to_file("counters.txt", outputs, [](const auto &e)
+                 { return e.perf_counter; });
 
     return results_dpu;
 }
