@@ -31,7 +31,7 @@ int main()
 {
     const auto home = std::filesystem::canonical("/proc/self/exe").parent_path();
 
-    auto [dataset_path, nsets, nw_parameters, ndpus] = read_parameters(home / "params.yaml");
+    auto [dataset_path, nsets, nw_parameters, ndpus] = read_parameters(home / "sets.yaml");
 
     printf("DPU mode:\n"
            "  forcing width to 128.\n"
