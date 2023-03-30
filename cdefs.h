@@ -7,17 +7,17 @@
 
 #include <stdint.h>
 
-#define DPU_MAX_NUMBER_OF_SEQUENCES 1024LU               // Max of total sequences in dpu
-#define DPU_MAX_NUMBER_OF_SEQUENCES_MRAM 16384LU         // Max of total sequences in dpu
-#define SCORE_METADATA_MAX_NUMBER_OF_SCORES 4096LU       // Max number of total alignment in dpu
-#define SCORE_METADATA_MAX_NUMBER_OF_SCORES_MRAM 32768LU // Max number of total alignment in dpu
-#define SCORE_METADATA_MAX_NUMBER_OF_SET 32LU            // Max number of set in a dpu
-#define DPU_MAX_NUMBER_OF_SET 32LU                       // Max number of set in a dpu
-#define SCORE_MAX_SEQUENCES_TOTAL_SIZE 3840000LU         // 4Mo of MRAM for sequences
-#define METADATA_MAX_NUMBER_OF_SCORES 4096LU             // Max number of pair alignment
-#define MAX_CIGAR_SIZE 20688640LU                        // 20Mo of MRAM for cigars
-#define DPU_MAX_SEQUENCE_SIZE 80000LU                    // Is use for direction bit array
-#define W_MAX 128LU                                      // Width of anti-diagonal use in dpu
+#define DPU_MAX_NUMBER_OF_SEQUENCES 1024LU                // Max of total sequences in dpu
+#define DPU_MAX_NUMBER_OF_SEQUENCES_MRAM 16384LU          // Max of total sequences in dpu
+#define SCORE_METADATA_MAX_NUMBER_OF_SCORES 4096LU        // Max number of total alignment in dpu
+#define SCORE_METADATA_MAX_NUMBER_OF_SCORES_MRAM 131072LU // Max number of total alignment in dpu
+#define SCORE_METADATA_MAX_NUMBER_OF_SET 32LU             // Max number of set in a dpu
+#define DPU_MAX_NUMBER_OF_SET 32LU                        // Max number of set in a dpu
+#define SCORE_MAX_SEQUENCES_TOTAL_SIZE 3840000LU          // 4Mo of MRAM for sequences
+#define METADATA_MAX_NUMBER_OF_SCORES 4096LU              // Max number of pair alignment
+#define MAX_CIGAR_SIZE 20688640LU                         // 20Mo of MRAM for cigars
+#define DPU_MAX_SEQUENCE_SIZE 80000LU                     // Is use for direction bit array
+#define W_MAX 128LU                                       // Width of anti-diagonal use in dpu
 
 // typedef uint16_t value_t;
 

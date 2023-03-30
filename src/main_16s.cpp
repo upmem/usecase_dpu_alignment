@@ -3,7 +3,6 @@
  */
 
 #include <cassert>
-#include <fstream>
 #include <yaml-cpp/yaml.h>
 
 #include "../libnwdpu/host/dpu_common.hpp"

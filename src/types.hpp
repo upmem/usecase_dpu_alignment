@@ -7,6 +7,7 @@
 
 #include <array>
 #include <filesystem>
+#include <fstream>
 #include <vector>
 
 #include "../cdefs.h"
