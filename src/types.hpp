@@ -191,10 +191,10 @@ constexpr inline C &encode(C &&c)
  * @param f Next function to apply to t
  * @return constexpr auto
  */
-template <typename T, typename F>
+template <typename T, typename F, typename std::enable_if_t<std::is_invocable<F, T>::value, bool> = true>
 constexpr inline auto operator|(T &&t, F f)
 {
-    return f(std::forward<T>(t));
+    return f(std::forward<decltype(t)>(t));
 }
 
 /**
