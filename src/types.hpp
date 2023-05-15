@@ -88,6 +88,8 @@ struct NwType
     /// @brief Aggregate data
     int score{};   /// Score from alignment
     Cigar cigar{}; /// CIGAR of the alignment
+    size_t dpu_offset{};
+    size_t mi{};
 };
 
 /********** Set / Sequence **********/

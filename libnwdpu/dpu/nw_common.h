@@ -56,10 +56,10 @@ static inline sysname_t group()
     return me() / 4;
 }
 
-__mram uint8_t trace_buffer[NR_GROUPS][40000 / 2 * W_MAX]; /// 2 * 40000 seq on 2bits
-__mram uint8_t te_buffer[NR_GROUPS][40000 / 4 * W_MAX];    /// 2 * 40000 seq on 1bit
-__mram uint8_t tf_buffer[NR_GROUPS][40000 / 4 * W_MAX];    /// 2 * 40000 seq on 1bit
-__mram uint8_t sequences[SCORE_MAX_SEQUENCES_TOTAL_SIZE];
+__mram_noinit uint8_t trace_buffer[NR_GROUPS][40000 / 2 * W_MAX]; /// 2 * 40000 seq on 2bits
+__mram_noinit uint8_t te_buffer[NR_GROUPS][40000 / 4 * W_MAX];    /// 2 * 40000 seq on 1bit
+__mram_noinit uint8_t tf_buffer[NR_GROUPS][40000 / 4 * W_MAX];    /// 2 * 40000 seq on 1bit
+__mram_noinit uint8_t sequences[SCORE_MAX_SEQUENCES_TOTAL_SIZE];
 WramAligned64 dna_reader_buffer1;
 WramAligned64 dna_reader_buffer2;
 

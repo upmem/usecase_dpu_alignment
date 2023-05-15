@@ -12,10 +12,9 @@
 #define SCORE_METADATA_MAX_NUMBER_OF_SCORES 4096LU        // Max number of total alignment in dpu
 #define SCORE_METADATA_MAX_NUMBER_OF_SCORES_MRAM 131072LU // Max number of total alignment in dpu
 #define SCORE_METADATA_MAX_NUMBER_OF_SET 32LU             // Max number of set in a dpu
-#define DPU_MAX_NUMBER_OF_SET 32LU                        // Max number of set in a dpu
-#define SCORE_MAX_SEQUENCES_TOTAL_SIZE 3840000LU          // 4Mo of MRAM for sequences
+#define SCORE_MAX_SEQUENCES_TOTAL_SIZE 3840000LU          // 4MB of MRAM for sequences
 #define METADATA_MAX_NUMBER_OF_SCORES 4096LU              // Max number of pair alignment
-#define MAX_CIGAR_SIZE 20688640LU                         // 20Mo of MRAM for cigars
+#define MAX_CIGAR_SIZE 32000000LU                         // 32MB of MRAM for cigars
 #define DPU_MAX_SEQUENCE_SIZE 80000LU                     // Is use for direction bit array
 #define W_MAX 128LU                                       // Width of anti-diagonal use in dpu
 
@@ -63,12 +62,8 @@ typedef struct NwMetadataDPU
     int32_t mismatch;                                    /// mismatch score
     int32_t gap_opening;                                 /// gap opening score
     int32_t gap_extension;                               /// gap extension score
+    int32_t pad;                                         /// padding for mram compliance
 } NwMetadataDPU;
-/*
-typedef struct NwSequenceMetadata
-{
-
-} NwSequenceMetadata;*/
 
 typedef struct NwSequenceMetadataMram
 {

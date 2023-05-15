@@ -14,11 +14,18 @@
  */
 struct Time : public timespec
 {
+    clockid_t cid;
+
     /// @brief Initialize time with a specific clocks
     /// @param clock_id
-    Time(clockid_t clock_id) : timespec()
+    Time(clockid_t clock_id) : timespec(), cid(clock_id)
     {
         clock_gettime(clock_id, this);
+    }
+
+    void Reset()
+    {
+        clock_gettime(cid, this);
     }
 
     /// @brief Converts timespec to double
@@ -43,6 +50,13 @@ class Timer
     Time cpu_time_start{CLOCK_PROCESS_CPUTIME_ID};
 
 public:
+    /// @brief Reset timer to current clock
+    void Reset()
+    {
+        wall_time_start.Reset();
+        cpu_time_start.Reset();
+    }
+
     /// @brief Returns the Wall time (Real world time)
     /// @return
     double Wall() const

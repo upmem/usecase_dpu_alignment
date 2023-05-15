@@ -16,13 +16,12 @@
 #endif
 
 __host NwMetadataDPU metadata;
-__mram uint8_t sequences[SCORE_MAX_SEQUENCES_TOTAL_SIZE];
 
-__mram uint8_t dirs[NR_GROUPS][DPU_MAX_SEQUENCE_SIZE * 2 / 8]; // Bit array
+__mram_noinit uint8_t dirs[NR_GROUPS][DPU_MAX_SEQUENCE_SIZE * 2 / 8]; // Bit array
 
 __host NwCigarOutput output;
-__mram uint8_t cigars[MAX_CIGAR_SIZE];
-__mram uint32_t cigar_indexes[METADATA_MAX_NUMBER_OF_SCORES];
+__mram_noinit uint8_t cigars[MAX_CIGAR_SIZE];
+__mram_noinit uint32_t cigar_indexes[METADATA_MAX_NUMBER_OF_SCORES];
 
 WramAligned64 dna_reader_buffer1;
 WramAligned64 dna_reader_buffer2;
@@ -283,9 +282,7 @@ int main()
     seq1_id = 0;
     seq2_id = 1;
 
-    // for (int id = 0; id < NR_TASKLETS; id++)
-    // tasklet_params[id].start = (id % 4) * 32;
-    perfcounter_config(PERF_COUNT_TYPE, true);
+    // perfcounter_config(PERF_COUNT_TYPE, true);
   }
   tasklet_params[me()].start = (me() % 4) * 32;
   barrier_wait(&start_barrier);

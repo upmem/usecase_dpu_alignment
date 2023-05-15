@@ -62,147 +62,157 @@ void push_back(CompressedSequences &cseqs, const CompressedSequence &cseq)
         cseqs[begin + i] = cseq[i];
 }
 
-inline bool load_can_fit(const Sets &sets, size_t mean_compute_load, size_t nr_of_dpus, size_t margin)
+inline auto sorted_map(const Sets &data)
 {
-    size_t dpu_index = 0;
-    std::vector<size_t> dpu_compute_load(nr_of_dpus, 0);
-    std::vector<size_t> set_compute_load{};
+    std::vector<std::tuple<int, size_t, size_t>> index{data.size()};
+
+    for (size_t i = 0; i < index.size(); i++)
+        index[i] = {i, count_compute_load(data[i]), 0};
+
+    std::sort(index.begin(), index.end(), [](const auto &a, const auto &b)
+              { return std::get<1>(a) > std::get<1>(b); });
+
+    return index;
+}
+
+auto bucket_sets(const Sets &data, auto &index, size_t n)
+{
+    std::vector<Sets> dpu_sets(n);
+    std::vector<size_t> dpu_loads(n);
+
+    for (auto &[i, load, d] : index)
+    {
+        auto min_index = std::distance(dpu_loads.begin(), std::min_element(dpu_loads.begin(), dpu_loads.end()));
+        dpu_sets[min_index].push_back(data[i]);
+        dpu_loads[min_index] += load;
+        d = min_index;
+    }
+
+    return dpu_sets;
+}
+
+inline void cpu_to_dpu(const Sets &sets, NwInputCigar &dpu_input)
+{
+    assert(sets.size() <= SCORE_METADATA_MAX_NUMBER_OF_SET &&
+           "Too many sets for DPU!\n");
+
+    auto &meta = dpu_input.metadata;
+    meta.number_of_sets = static_cast<uint32_t>(sets.size());
+
+    uint32_t idx = 0;
+    uint32_t seq_idx = 0;
+    uint32_t cigar_index = 0;
+    uint32_t cigar_offset = 0;
+
+    for (size_t set_id = 0; set_id < sets.size(); set_id++)
+        meta.set_sizes[set_id] = static_cast<uint8_t>(sets[set_id].size());
 
     for (const auto &set : sets)
-        set_compute_load.emplace_back(count_compute_load(set));
-
-    for (size_t i = 0; i < sets.size(); i++)
     {
-        if (dpu_compute_load[dpu_index] + set_compute_load[i] > (mean_compute_load + margin))
-            dpu_index++;
-
-        if (dpu_index >= nr_of_dpus)
-            return false;
-
-        dpu_compute_load[dpu_index] += set_compute_load[i];
-    }
-
-    return true;
-}
-
-inline size_t find_lowest_limit(const Sets &sets, size_t mean_compute_load, size_t nr_of_dpus)
-{
-    uint32_t mil = mean_compute_load / 1000;
-    for (size_t margin = 0;; margin += mil)
-        if (load_can_fit(sets, mean_compute_load, nr_of_dpus, margin))
-            return margin;
-}
-
-/**
- * @brief check if current dpu can fit the set compute load.
- * Go to the next dpu if not. Assert if not enough DPUs.
- *
- * @param set set to add
- * @param dpu_compute_load current load of DPUs.
- * @param mean mean load of all set per DPU to target
- * @param margin smallest working margin
- * @param idx current DPU index
- * @param nr_dpu total number of DPUs
- * @return size_t
- */
-static inline size_t add_dpu_load(const auto &set, auto &dpu_compute_load, size_t mean, size_t margin, size_t idx, size_t nr_dpu)
-{
-    auto set_compute_load = count_compute_load(set);
-
-    if (dpu_compute_load[idx] + set_compute_load > (mean + margin))
-        idx++;
-
-    assert(idx < nr_dpu && "Could not fit the dataset in dpus fairly, not enough dpus!\n");
-
-    dpu_compute_load[idx] += set_compute_load;
-
-    return idx;
-}
-
-std::vector<NwInputCigar> fair_dispatch(const Sets &data, size_t nr_of_dpus, const NwParameters &p)
-{
-    printf("\nDispatch:\n");
-    std::vector<NwInputCigar> dpu_input(nr_of_dpus);
-    for (auto &d : dpu_input)
-    {
-        d.sequences.reserve(SCORE_MAX_SEQUENCES_TOTAL_SIZE);
-        d.cigar_indexes.resize(METADATA_MAX_NUMBER_OF_SCORES);
-    }
-
-    assert(data.size() <= nr_of_dpus * SCORE_METADATA_MAX_NUMBER_OF_SET &&
-           "Too many sets per DPU!\n");
-
-    auto mean_compute_load = count_compute_load(data) / nr_of_dpus;
-    size_t dpu_index = 0;
-    std::vector<size_t> dpu_offset(nr_of_dpus, 0);
-    std::vector<size_t> dpu_indexes(nr_of_dpus, 0);
-    std::vector<size_t> dpu_cigar_indexes_offset(nr_of_dpus, 0);
-    std::vector<size_t> dpu_current_cigar_index(nr_of_dpus, 0);
-    std::vector<size_t> dpu_compute_load(nr_of_dpus, 0);
-
-    size_t margin = find_lowest_limit(data, mean_compute_load, nr_of_dpus);
-
-    printf("  margin: %.1f%%\n", static_cast<float>(margin * 100) / static_cast<float>(mean_compute_load));
-
-    for (const auto &set : data)
-    {
-        auto cset = compress_set(set);
-
-        dpu_index = add_dpu_load(set, dpu_compute_load, mean_compute_load, margin, dpu_index, nr_of_dpus);
-
-        auto &meta = dpu_input[dpu_index].metadata;
-
-        assert(meta.number_of_sets < SCORE_METADATA_MAX_NUMBER_OF_SET &&
-               "Too much sets in one dpu!\n");
-
-        auto off = dpu_offset[dpu_index];
-        for (size_t i = 0; i < set.size(); i++)
+        for (const auto &seq : set)
         {
-            assert(off + i < DPU_MAX_NUMBER_OF_SEQUENCES &&
-                   "Too much sequence in one dpu!\n");
-            meta.lengths[off + i] = set[i].size();
-            meta.indexes[off + i] = dpu_indexes[dpu_index];
-            dpu_indexes[dpu_index] += cset[i].size();
+            auto cseq = compress_sequence(seq);
+            meta.lengths[seq_idx] = static_cast<uint16_t>(seq.size());
+            meta.indexes[seq_idx++] = idx;
+            idx += cseq.size();
+            push_back(dpu_input.sequences, cseq);
         }
-        dpu_offset[dpu_index] += set.size();
+        assert(dpu_input.sequences.size() < SCORE_MAX_SEQUENCES_TOTAL_SIZE &&
+               "dpu sequence buffer overflow!\n");
 
         for (size_t i = 0; i < set.size() - 1; i++)
             for (size_t j = i + 1; j < set.size(); j++)
             {
-                dpu_input[dpu_index].cigar_indexes[dpu_cigar_indexes_offset[dpu_index]++] = dpu_current_cigar_index[dpu_index];
-                uint32_t max_cigar_size = set[i].size() + set[j].size();
+                dpu_input.cigar_indexes[cigar_offset++] = cigar_index;
+                auto max_cigar_size = set[i].size() + set[j].size();
 
                 assert(set[i].size() + set[j].size() < UINT16_MAX && "cigar is to big for uint16_t\n");
 
-                // max_cigar_size -= max_cigar_size / 4;
                 max_cigar_size += (8 - (max_cigar_size % 8));
-                dpu_current_cigar_index[dpu_index] += max_cigar_size;
+                cigar_index += max_cigar_size;
 
-                assert(dpu_current_cigar_index[dpu_index] < MAX_CIGAR_SIZE && "not enough space for cigar on dpu!\n");
-                assert(dpu_cigar_indexes_offset[dpu_index] <= METADATA_MAX_NUMBER_OF_SCORES && "too much cigar to compute!\n");
+                assert(cigar_index < MAX_CIGAR_SIZE && "not enough space for cigar on dpu!\n");
+                assert(cigar_offset <= METADATA_MAX_NUMBER_OF_SCORES && "too much cigar to compute!\n");
             }
-
-        meta.set_sizes[meta.number_of_sets] = set.size();
-        meta.number_of_sets++;
-
-        for (const auto &cseq : cset)
-            push_back(dpu_input[dpu_index].sequences, cseq);
-
-        assert(dpu_input[dpu_index].sequences.size() < SCORE_MAX_SEQUENCES_TOTAL_SIZE &&
-               "dpu sequence buffer overflow!\n");
     }
+}
 
-    printf("  dpu not used: %zu\n", nr_of_dpus - 1 - dpu_index);
+auto dispatchv2(const Sets &data, size_t nr_of_dpus, const NwParameters &p, std::vector<std::tuple<int, size_t, size_t>> &index)
+{
+    index = sorted_map(data);
+    auto dpu_sets = bucket_sets(data, index, nr_of_dpus);
 
-    for (auto &dpu : dpu_input)
+    std::vector<NwInputCigar> dpu_input(nr_of_dpus);
+#pragma omp parallel for num_threads(2)
+    for (size_t i = 0; i < nr_of_dpus; i++)
     {
-        dpu.metadata.match = p.match;
-        dpu.metadata.mismatch = p.mismatch;
-        dpu.metadata.gap_opening = p.gap_opening;
-        dpu.metadata.gap_extension = p.gap_extension;
+        dpu_input[i].metadata.match = p.match;
+        dpu_input[i].metadata.mismatch = p.mismatch;
+        dpu_input[i].metadata.gap_opening = p.gap_opening;
+        dpu_input[i].metadata.gap_extension = p.gap_extension;
+        dpu_input[i].sequences.reserve(SCORE_MAX_SEQUENCES_TOTAL_SIZE);
+        dpu_input[i].cigar_indexes.resize(METADATA_MAX_NUMBER_OF_SCORES);
+
+        cpu_to_dpu(dpu_sets[i], dpu_input[i]);
     }
 
     return dpu_input;
+}
+
+auto dpu_to_cpu(std::vector<std::vector<NwType>> &res, const NwInputCigar &input, const NwCigarOutput &output, size_t mi)
+{
+    const auto &meta = input.metadata;
+    res.resize(meta.number_of_sets);
+
+    auto comb = [](auto n)
+    { return n * (n - 1) / 2; };
+
+    int dpu_offset = 0;
+
+    for (size_t set_id = 0; set_id < meta.number_of_sets; set_id++)
+    {
+        int set_offset = 0;
+        res[set_id].resize(comb(meta.set_sizes[set_id]));
+        for (int i = 0; i < meta.set_sizes[set_id]; i++)
+            for (int j = i + 1; j < meta.set_sizes[set_id]; j++)
+            {
+                res[set_id][set_offset].score = output.scores[dpu_offset];
+                res[set_id][set_offset].dpu_offset = dpu_offset;
+                res[set_id][set_offset].mi = mi;
+                dpu_offset++;
+                set_offset++;
+            }
+    }
+
+    return res;
+}
+
+std::vector<NwType> dpus_to_cpu(const auto &sets, const auto &inputs, const auto &outputs, const auto &cigars, const std::vector<std::tuple<int, size_t, size_t>> &index)
+{
+    std::vector<std::vector<std::vector<NwType>>> dpu_res(inputs.size());
+#pragma omp parallel for num_threads(2)
+    for (size_t i = 0; i < inputs.size(); i++)
+        dpu_to_cpu(dpu_res[i], inputs[i], outputs[i], i);
+
+    std::vector<std::vector<NwType>> cpu_res{sets.size()};
+    for (const auto &[i, load, d] : index)
+    {
+        cpu_res[i] = dpu_res[d].front();
+        dpu_res[d].erase(dpu_res[d].begin());
+    }
+
+    std::vector<NwType> cpu_output(count_unique_pair(sets));
+    size_t g = 0;
+    for (const auto &res : cpu_res)
+        for (const auto &r : res)
+        {
+            cpu_output[g] = r;
+            cpu_output[g].cigar.resize(outputs[r.mi].lengths[r.dpu_offset]);
+            cpu_output[g].cigar.assign(&cigars[r.mi][inputs[r.mi].cigar_indexes[r.dpu_offset]], outputs[r.mi].lengths[r.dpu_offset]);
+            g++;
+        }
+
+    return cpu_output;
 }
 
 void send_cigar_input(dpu_set_t &dpu_set, std::vector<NwInputCigar> &inputs)
@@ -254,32 +264,6 @@ void gather_cigar_output(dpu_set_t &dpu_set, std::vector<NwCigarOutput> &outputs
                              MAX_CIGAR_SIZE, DPU_XFER_ASYNC));
 }
 
-std::vector<NwType> dpu_to_cpu_format(const auto &sets, const auto &inputs, const auto &outputs, const auto &cigars)
-{
-    std::vector<NwType> cpu_output(count_unique_pair(sets));
-
-    auto comb = [](auto n)
-    { return n * (n - 1) / 2; };
-
-    size_t i = 0;
-    for (size_t d = 0; d < inputs.size(); d++)
-    {
-        size_t s = 0;
-        for (size_t n = 0; n < inputs[d].metadata.number_of_sets; n++)
-            for (int ns = 0; ns < comb(inputs[d].metadata.set_sizes[n]); ns++)
-            {
-                cpu_output[i].score = outputs[d].scores[s];
-                cpu_output[i].cigar.resize(outputs[d].lengths[s]);
-                cpu_output[i].cigar.assign(&cigars[d][inputs[d].cigar_indexes[s]], outputs[d].lengths[s]);
-
-                s++;
-                i++;
-            }
-    }
-
-    return cpu_output;
-}
-
 dpu_set_t init_dpu(const std::filesystem::path &filename, size_t count)
 {
     dpu_set_t dpus{};
@@ -294,7 +278,8 @@ dpu_set_t init_dpu(const std::filesystem::path &filename, size_t count)
 std::vector<NwType> dpu_cigar_pipeline(std::string dpu_bin_path, const NwParameters &p, size_t nr_dpu, const Sets &sets)
 {
     Timer dispatch_time{};
-    auto dpu_inputs = fair_dispatch(sets, nr_dpu, p);
+    std::vector<std::tuple<int, size_t, size_t>> index;
+    auto dpu_inputs = dispatchv2(sets, nr_dpu, p, index);
     dispatch_time.Print("  ");
 
     std::vector<NwCigarOutput> dpu_outputs(nr_dpu);
@@ -312,7 +297,7 @@ std::vector<NwType> dpu_cigar_pipeline(std::string dpu_bin_path, const NwParamet
     // Add to dump DPU counters and analyse their individual workload.
     // dump_to_file("counters.txt", dpu_outputs, [](const auto &e) { return e.perf_counter; });
 
-    return dpu_to_cpu_format(sets, dpu_inputs, dpu_outputs, dpu_cigars);
+    return dpus_to_cpu(sets, dpu_inputs, dpu_outputs, dpu_cigars, index);
 }
 
 auto Set_to_dpuSet(const Set &data, const NwParameters &params)
