@@ -173,8 +173,6 @@ int main()
     mutex_unlock(score_mutex);
   }
 
-  output.nr_score = meta_index.count;
-
   barrier_wait(&end_barrier);
 
   if (me() == 0)

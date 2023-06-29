@@ -9,7 +9,7 @@ The second one named dpu_16s is an exemple of comparing a database of 16S RNA, a
 ## Libraries needed
 
 > - UPMEM SDK
-> - c++17 with filesystem library (gcc vesrion >=8)
+> - filesystem and span std library (gcc vesrion >=10)
 > - yaml-cpp
 
 ## Build

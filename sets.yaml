@@ -1,7 +1,7 @@
 dataset: data/dataset.fasta
 groundtruth: data/cigars_truth.txt
-sets_number: 20
-dpus_number: 10
+sets_number: 20000
+ranks: 40
 
 nw_params:
   match: 2

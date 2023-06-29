@@ -1,5 +1,5 @@
-dataset: data/out_ncbi_16SRNA_Bacteria.fasta # data/s1000a.fa #
-dpus_number: 2000
+dataset: data/s1000a.fa # data/out_ncbi_16SRNA_Bacteria.fasta #
+ranks: 40
 
 nw_params:
   match: 2

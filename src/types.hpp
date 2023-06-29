@@ -6,6 +6,7 @@
 #define AD18B383_F97E_4512_98DA_46CE2947ACDD
 
 #include <array>
+#include <concepts>
 #include <filesystem>
 #include <fstream>
 #include <vector>
@@ -102,14 +103,23 @@ using CompressedSequences = std::vector<uint8_t>;      /// Compressed sequences 
 using CompressedSet = std::vector<CompressedSequence>; /// Compressed set type
 
 /**
- * @brief Returns number of unique pair that can be made from a set.
+ * @brief Sum of the first i numbers, starting at 0.
  *
- * @param set set of sequence to pair
- * @return size_t
+ * @param i
+ * @return auto
  */
-inline size_t count_unique_pair(const Set &set)
+static constexpr auto sum_integers(std::integral auto i)
 {
-    return (set.size() * (set.size() - 1)) / 2;
+    return i * (i - 1) / 2;
+}
+
+/**
+ * @brief Round number to the next multiple of 8
+ *
+ */
+static constexpr auto round_up8(std::integral auto n)
+{
+    return (n + 7) & ~7;
 }
 
 /**
@@ -122,7 +132,7 @@ inline size_t count_unique_pair(const Sets &sets)
 {
     size_t res = 0;
     for (const auto &set : sets)
-        res += count_unique_pair(set);
+        res += sum_integers(set.size());
     return res;
 }
 
@@ -165,9 +175,9 @@ inline size_t count_compute_load(const Sets &sets)
  * @param c nucleotide
  */
 template <typename C>
-constexpr inline C &encode(C &&c)
+constexpr C &encode(C &&c)
 {
-    if constexpr (std::is_same<char, std::remove_reference_t<C>>::value)
+    if constexpr (std::is_same_v<char, std::remove_reference_t<C>>)
     {
         c >>= 1;
         constexpr uint8_t mask = 0b11;
@@ -194,7 +204,7 @@ constexpr inline C &encode(C &&c)
  * @return constexpr auto
  */
 template <typename T, typename F, typename std::enable_if_t<std::is_invocable<F, T>::value, bool> = true>
-constexpr inline auto operator|(T &&t, F f)
+constexpr auto operator|(T &&t, F f)
 {
     return f(std::forward<decltype(t)>(t));
 }
@@ -235,7 +245,7 @@ void dump_to_file(const std::filesystem::path &filename, const auto &Container, 
  * @return constexpr auto
  */
 template <typename Container>
-static constexpr inline auto resize(size_t i)
+static constexpr auto resize(size_t i)
 {
     return [i](Container &&s) -> Container
     {
@@ -263,18 +273,6 @@ static inline auto print_size(const std::string &str)
 }
 
 /**
- * @brief Sum of the first i numbers, starting at 0.
- *
- * @param i
- * @return auto
- */
-static inline auto sum_integers(auto i)
-{
-    static_assert(std::is_integral<decltype(i)>::value, "Integral type required !");
-    return i * (i - 1) / 2;
-}
-
-/**
  * @brief Gives the index in a linear buffer of an upper triangular matrix index
  *
  * @param i i th row
@@ -285,6 +283,75 @@ static inline auto sum_integers(auto i)
 static inline size_t triangular_index(size_t i, size_t j, size_t n)
 {
     return sum_integers(n) - sum_integers(n - i) + j - i - 1;
+}
+
+/**
+ * @brief Return the size a dpu buffer needs to contains the compressed representation of a sequence
+ *
+ * @param size
+ * @return constexpr uint32_t
+ */
+constexpr uint32_t compressed_size(size_t size)
+{
+    auto compressed_size = static_cast<uint32_t>((size + 3) / 4);
+    return round_up8(compressed_size);
+}
+
+/**
+ * @brief Return the compressed representation a sequence
+ *
+ * @param seq
+ * @return CompressedSequence
+ */
+inline CompressedSequence compress_sequence(const Sequence &seq)
+{
+    uint32_t csize = compressed_size(seq.size());
+    CompressedSequence cseq(csize);
+
+    for (size_t i = 0; i < cseq.size(); i++)
+    {
+        size_t seq_id = i * 4;
+        uint8_t c4n = seq[seq_id];
+        c4n |= (seq[seq_id + 1] << 2);
+        c4n |= (seq[seq_id + 2] << 4);
+        c4n |= (seq[seq_id + 3] << 6);
+
+        cseq[i] = c4n;
+    }
+
+    return cseq;
+}
+
+/**
+ * @brief Returns a Set of the compressed sequences
+ *
+ * @param set
+ * @return CompressedSet
+ */
+inline CompressedSet compress_set(const Set &set)
+{
+    CompressedSet cset(set.size());
+
+#pragma omp parallel for
+    for (size_t i = 0; i < set.size(); i++)
+        cset[i] = compress_sequence(set[i]);
+
+    return cset;
+}
+
+/**
+ * @brief Concat a compressed sequence to an existing buffer
+ *
+ * @param cseqs
+ * @param cseq
+ */
+inline void push_back(CompressedSequences &cseqs, const CompressedSequence &cseq)
+{
+    size_t begin = cseqs.size();
+    cseqs.resize(begin + cseq.size());
+
+    for (size_t i = 0; i < cseq.size(); i++)
+        cseqs[begin + i] = cseq[i];
 }
 
 #endif /* AD18B383_F97E_4512_98DA_46CE2947ACDD */

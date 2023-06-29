@@ -106,9 +106,8 @@ typedef struct NwCigarOutput
 typedef struct NwScoreOutput
 {
     /// @brief Relevant data
-    int32_t scores[SCORE_METADATA_MAX_NUMBER_OF_SCORES_MRAM]; /// score of comparison
-    uint32_t nr_score;                                        /// number of comparison done
     uint64_t perf_counter;                                    /// performance counter
+    int32_t scores[SCORE_METADATA_MAX_NUMBER_OF_SCORES_MRAM]; /// score of comparison
 } NwScoreOutput;
 
 #endif /* EFB491BB_CE51_45FE_BB8B_8CD42179622B */

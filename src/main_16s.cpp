@@ -12,7 +12,7 @@ auto read_parameters(const std::filesystem::path &filename)
 {
     auto config = YAML::LoadFile(filename.native());
     auto dataset = config["dataset"].as<std::string>();
-    auto dpus_number = config["dpus_number"].as<uint32_t>();
+    auto ranks = config["ranks"].as<uint32_t>();
     auto params = config["nw_params"];
 
     const auto home = std::filesystem::canonical("/proc/self/exe").parent_path();
@@ -24,17 +24,17 @@ auto read_parameters(const std::filesystem::path &filename)
                      params["gap_opening"].as<int32_t>(),
                      params["gap_extension"].as<int32_t>(),
                      128},
-        dpus_number};
+        ranks};
 }
 
 int main()
 {
-    auto [dataset_path, params, ndpu] = read_parameters("./16s.yaml");
+    auto [dataset_path, params, ranks] = read_parameters("./16s.yaml");
 
     printf("DPU mode:\n"
            "  forcing width to 128.\n"
-           "  using %u dpus.\n\n",
-           ndpu);
+           "  using %u ranks.\n\n",
+           ranks);
     params.Print();
 
     printf("Dataset:\n");
@@ -43,7 +43,7 @@ int main()
                    encode<Set>;
 
     Timer compute_time{};
-    auto alignments = dpu_16s_pipeline("./libnwdpu/dpu/nw_16s", params, ndpu, dataset);
+    auto alignments = dpu_16s_pipeline("./libnwdpu/dpu/nw_16s", params, ranks, dataset);
     compute_time.Print("  ");
 
     dump_to_file("scores.txt", alignments, [](const auto &e)
