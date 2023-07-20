@@ -613,7 +613,7 @@ static inline void wait_for_work()
 
     while (true)
     {
-        __asm__ volatile("stop;");
+        __asm__ volatile("stop false, 1f; 1:");
 
         switch (tasklet_params[me()].func)
         {
