@@ -8,59 +8,80 @@
 #include <stdint.h>
 #include <time.h>
 
+/**
+ * @brief Wrapper around timespec for easy convertion
+ *
+ */
 struct Time : public timespec
 {
-    operator double() { return static_cast<double>(tv_sec) + static_cast<double>(tv_nsec) * 1e-9; }
+    clockid_t cid;
+
+    /// @brief Initialize time with a specific clocks
+    /// @param clock_id
+    Time(clockid_t clock_id) : timespec(), cid(clock_id)
+    {
+        clock_gettime(clock_id, this);
+    }
+
+    void Reset()
+    {
+        clock_gettime(cid, this);
+    }
+
+    /// @brief Converts timespec to double
+    operator double() const
+    {
+        return static_cast<double>(tv_sec) + static_cast<double>(tv_nsec) * 1e-9;
+    }
+
+    /// @brief Returns the difference between to times in floating point seconds
+    /// @param t2
+    /// @return
+    double operator-(const Time &t2) const { return static_cast<double>(*this) - static_cast<double>(t2); }
 };
 
 /**
- * @brief Timer to count both cpu and wall time. Used to see core usage.
+ * @brief Timer to count both CPU and Wall time. Used to see core usage.
  *
  */
 class Timer
 {
-    timespec wall_time_start{};
-    timespec cpu_time_start{};
+    Time wall_time_start{CLOCK_MONOTONIC_RAW};
+    Time cpu_time_start{CLOCK_PROCESS_CPUTIME_ID};
 
 public:
-    Timer()
+    /// @brief Reset timer to current clock
+    void Reset()
     {
-        clock_gettime(CLOCK_MONOTONIC_RAW, &wall_time_start);
-        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &cpu_time_start);
+        wall_time_start.Reset();
+        cpu_time_start.Reset();
     }
 
-    double wall() const
+    /// @brief Returns the Wall time (Real world time)
+    /// @return
+    double Wall() const
     {
-        timespec wall_time_stop{};
-        clock_gettime(CLOCK_MONOTONIC_RAW, &wall_time_stop);
-
-        return Time{{wall_time_stop.tv_sec - wall_time_start.tv_sec, wall_time_stop.tv_nsec - wall_time_start.tv_nsec}};
+        return Time{CLOCK_MONOTONIC_RAW} - wall_time_start;
     }
 
-    double
-    cpu() const
+    /// @brief Returns the CPU time (affected by multithreading)
+    /// @return
+    double CPU() const
     {
-        timespec cpu_time_stop{};
-        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &cpu_time_stop);
-
-        return Time{{cpu_time_stop.tv_sec - cpu_time_start.tv_sec, cpu_time_stop.tv_nsec - cpu_time_start.tv_nsec}};
+        return Time{CLOCK_PROCESS_CPUTIME_ID} - cpu_time_start;
     }
 
-    void reset()
-    {
-        clock_gettime(CLOCK_MONOTONIC_RAW, &wall_time_start);
-        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &cpu_time_start);
-    }
-
-    void print(const std::string &prefix = "") const
+    /// @brief Prints timers and the ratio between the two
+    /// @param prefix
+    void Print(const std::string &prefix = "") const
     {
         printf(
             (prefix + "times:\n" +
-             prefix + "  wall:  %.2f\n" +
-             prefix + "  cpu:   %.2f\n" +
+             prefix + "  Wall:  %.2f\n" +
+             prefix + "  CPU:   %.2f\n" +
              prefix + "  ratio: %.1f\n")
                 .c_str(),
-            wall(), cpu(), cpu() / wall());
+            Wall(), CPU(), CPU() / Wall());
     }
 };
 

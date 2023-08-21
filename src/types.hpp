@@ -6,43 +6,32 @@
 #define AD18B383_F97E_4512_98DA_46CE2947ACDD
 
 #include <array>
+#include <concepts>
 #include <filesystem>
+#include <fstream>
 #include <vector>
 
 #include "../cdefs.h"
 #include "timer.hpp"
 
-static constexpr size_t NB_NUCLEOTIDE = 5;
-
-using SimilarityMatrix = std::array<int8_t, NB_NUCLEOTIDE * NB_NUCLEOTIDE>;
-constexpr SimilarityMatrix make_similarity_matrix(int pM, int pX)
+/**
+ * @brief Needleman & Wunsch parameters
+ *
+ */
+struct NwParameters
 {
-    int8_t M = static_cast<int8_t>(pM);
-    int8_t X = static_cast<int8_t>(pX);
-    return {
-        M, X, X, X, 0,
-        X, M, X, X, 0,
-        X, X, M, X, 0,
-        X, X, X, M, 0,
-        0, 0, 0, 0, 0};
-}
+    /// @brief Public parameters
+    int32_t match;         /// match bonus
+    int32_t mismatch;      /// mismatch penalty
+    int32_t gap_opening;   /// gap opening penalty
+    int32_t gap_extension; /// gap extension penalty
+    int32_t width;         /// band width
 
-struct NW_Parameters
-{
-    int match;
-    int mismatch;
-    int32_t gap_opening;
-    int32_t gap_extension;
-    int width;
-    SimilarityMatrix smat;
-
-    NW_Parameters() = default;
-    NW_Parameters(const NW_Parameters &) = default;
-    NW_Parameters(NW_Parameters &&) = default;
-    NW_Parameters &operator=(const NW_Parameters &) = default;
-    NW_Parameters &operator=(NW_Parameters &&) = default;
-    ~NW_Parameters() = default;
-    void print() const
+    /**
+     * @brief Print Needleman & Wunsch parameters
+     *
+     */
+    void Print() const
     {
         printf("Alignment parameters:\n"
                "  match:         %d\n"
@@ -52,25 +41,21 @@ struct NW_Parameters
                "  width:         %d\n\n",
                match, mismatch, gap_opening, gap_extension, width);
     }
-
-    constexpr NW_Parameters(
-        int _match,
-        int _miss,
-        int32_t _gapo1,
-        int32_t _gape1,
-        int _width) : match(_match),
-                      mismatch(_miss),
-                      gap_opening(_gapo1),
-                      gap_extension(_gape1),
-                      width(_width),
-                      smat(make_similarity_matrix(_match, _miss))
-    {
-    }
 };
 
+/**
+ * @brief CIGAR Representation
+ *
+ */
 struct Cigar : public std::string
 {
-    int count_score(const NW_Parameters &params) const
+    /**
+     * @brief Computes score of CIGAR
+     *
+     * @param params Bonus/Penalties to use for score computation
+     * @return Score
+     */
+    int CountScore(const NwParameters &params) const
     {
         int score = 0;
         int gap = 0;
@@ -92,53 +77,71 @@ struct Cigar : public std::string
     }
 };
 
+/// @brief Type for a collection of CIGARs
 using Cigars = std::vector<Cigar>;
 
-struct nw_t
+/**
+ * @brief Type for Needleman & Wunsch return values
+ *
+ */
+struct NwType
 {
-    int score{};
-    Cigar cigar{};
-    bool zdropped = false;
-
-    nw_t() = default;
-    explicit nw_t(const nw_t &nw) = default;
-    explicit nw_t(nw_t &&nw) = default;
-    nw_t &operator=(const nw_t &nw) = default;
-    nw_t &operator=(nw_t &&nw) = default;
-    ~nw_t() = default;
-
-    nw_t(int s, const Cigar &c) : score(s), cigar(c) {}
+    /// @brief Aggregate data
+    int score{};   /// Score from alignment
+    Cigar cigar{}; /// CIGAR of the alignment
+    size_t dpu_offset{};
+    size_t mi{};
 };
 
 /********** Set / Sequence **********/
 
-using Sequence = std::string;
-using Sequences = std::vector<Sequence>;
-using Set = Sequences;
-using Sets = std::vector<Set>;
-using CompressedSequence = std::vector<uint8_t>;
-using CompressedSequences = std::vector<uint8_t>;
-using CompressedSet = std::vector<CompressedSequence>;
+using Sequence = std::string;                          /// Sequence type
+using Set = std::vector<Sequence>;                     /// Set type
+using Sets = std::vector<Set>;                         /// Sets type
+using CompressedSequence = std::vector<uint8_t>;       /// Compressed sequence type
+using CompressedSequences = std::vector<uint8_t>;      /// Compressed sequences type
+using CompressedSet = std::vector<CompressedSequence>; /// Compressed set type
 
 /**
- * @brief Returns number of unique pair that can be made from set of sequences.
+ * @brief Sum of the first i numbers, starting at 0.
  *
- * @param set set of sequence to pair
- * @return size_t
+ * @param i
+ * @return auto
  */
-inline size_t count_unique_pair(const Set &set)
+static constexpr auto sum_integers(std::integral auto i)
 {
-    return (set.size() * (set.size() - 1)) / 2;
+    return i * (i - 1) / 2;
 }
 
+/**
+ * @brief Round number to the next multiple of 8
+ *
+ */
+static constexpr auto round_up8(std::integral auto n)
+{
+    return (n + 7) & ~7;
+}
+
+/**
+ * @brief Returns the total number of unique pairs in a collection of set
+ *
+ * @param sets
+ * @return size_t
+ */
 inline size_t count_unique_pair(const Sets &sets)
 {
     size_t res = 0;
     for (const auto &set : sets)
-        res += count_unique_pair(set);
+        res += sum_integers(set.size());
     return res;
 }
 
+/**
+ * @brief Estimate the number of cells to compute for given Set (assuming banded N&W)
+ *
+ * @param set
+ * @return Load estimation
+ */
 inline size_t count_compute_load(const Set &set)
 {
     size_t compute_load = 0;
@@ -149,6 +152,12 @@ inline size_t count_compute_load(const Set &set)
     return compute_load;
 }
 
+/**
+ * @brief Estimate the total compute load of a collection of Set.
+ *
+ * @param sets
+ * @return size_t
+ */
 inline size_t count_compute_load(const Sets &sets)
 {
     size_t compute_load = 0;
@@ -161,48 +170,52 @@ inline size_t count_compute_load(const Sets &sets)
 /********** nucleotide to ksw2 encoding **********/
 
 /**
- * @brief Encode from ACTG/actg to 0123, undefined outside good values
+ * @brief Encode from ACTG/actg to 0123, undefined for other values
  *
  * @param c nucleotide
  */
-constexpr inline void encode_base(char &c)
+template <typename C>
+constexpr C &encode(C &&c)
 {
-    c >>= 1;
-    constexpr uint8_t mask = 0b11;
-    c &= mask;
+    if constexpr (std::is_same_v<char, std::remove_reference_t<C>>)
+    {
+        c >>= 1;
+        constexpr uint8_t mask = 0b11;
+        c &= mask;
+
+        return c;
+    }
+    else
+    {
+        for (auto &e : c)
+            encode(e);
+
+        return c;
+    }
 }
 
 /**
- * @brief Encode from ACTG to 0123 all element in collections.
+ * @brief A small helper operator to chain operations
  *
- * @param S
+ * @tparam T
+ * @tparam F
+ * @param t Data to apply the function on
+ * @param f Next function to apply to t
+ * @return constexpr auto
  */
-inline void encode_base(auto &S)
+template <typename T, typename F, typename std::enable_if_t<std::is_invocable<F, T>::value, bool> = true>
+constexpr auto operator|(T &&t, F f)
 {
-    for (auto &s : S)
-        encode_base(s);
+    return f(std::forward<decltype(t)>(t));
 }
 
-inline Set encode_set(Set &S)
-{
-    for (auto &s : S)
-        encode_base(s);
-    return S;
-}
-
-inline Sets encode_sets(Sets &&S)
-{
-    for (auto &s : S)
-        encode_base(s);
-    return S;
-}
-
-template <typename T, typename F>
-constexpr inline auto operator|(T &&t, F f)
-{
-    return f(std::forward<T>(t));
-}
-
+/**
+ * @brief Dump all the element from a container to a file. Accessor applied on element.
+ *
+ * @param filename
+ * @param Container
+ * @param Accessor
+ */
 void dump_to_file(const std::filesystem::path &filename, const auto &Container, const auto &Accessor)
 {
     std::ofstream file(filename);
@@ -213,15 +226,28 @@ void dump_to_file(const std::filesystem::path &filename, const auto &Container, 
         file << Accessor(e) << '\n';
 }
 
+/**
+ * @brief Exit the program after printing a given error message
+ *
+ * @param message
+ */
 [[noreturn]] static inline void exit(std::string message)
 {
     printf("%s\n", message.c_str());
     std::exit(EXIT_FAILURE);
 }
 
-static constexpr inline auto resize(size_t i)
+/**
+ * @brief Resize a container to a smaller size, nothing is done if size greater than current size.
+ *
+ * @tparam Container
+ * @param i
+ * @return constexpr auto
+ */
+template <typename Container>
+static constexpr auto resize(size_t i)
 {
-    return [i](Sets &&s) -> Sets
+    return [i](Container &&s) -> Container
     {
         if (s.size() > i)
             s.resize(i);
@@ -229,13 +255,103 @@ static constexpr inline auto resize(size_t i)
     };
 }
 
+/**
+ * @brief Return a ffunction printing the size of container with given string prefixed
+ *
+ * @tparam C
+ * @param str
+ * @return auto
+ */
+template <typename C>
 static inline auto print_size(const std::string &str)
 {
-    return [str](Sets &&sets)
+    return [str](C &&container)
     {
-        printf(("  " + str + ": %lu\n").c_str(), sets.size());
-        return sets;
+        printf((str + "%lu\n").c_str(), container.size());
+        return container;
     };
+}
+
+/**
+ * @brief Gives the index in a linear buffer of an upper triangular matrix index
+ *
+ * @param i i th row
+ * @param j j th column
+ * @param n matrix size
+ * @return size_t
+ */
+static inline size_t triangular_index(size_t i, size_t j, size_t n)
+{
+    return sum_integers(n) - sum_integers(n - i) + j - i - 1;
+}
+
+/**
+ * @brief Return the size a dpu buffer needs to contains the compressed representation of a sequence
+ *
+ * @param size
+ * @return constexpr uint32_t
+ */
+constexpr uint32_t compressed_size(size_t size)
+{
+    auto compressed_size = static_cast<uint32_t>((size + 3) / 4);
+    return round_up8(compressed_size);
+}
+
+/**
+ * @brief Return the compressed representation a sequence
+ *
+ * @param seq
+ * @return CompressedSequence
+ */
+inline CompressedSequence compress_sequence(const Sequence &seq)
+{
+    uint32_t csize = compressed_size(seq.size());
+    CompressedSequence cseq(csize);
+
+    for (size_t i = 0; i < cseq.size(); i++)
+    {
+        size_t seq_id = i * 4;
+        uint8_t c4n = seq[seq_id];
+        c4n |= (seq[seq_id + 1] << 2);
+        c4n |= (seq[seq_id + 2] << 4);
+        c4n |= (seq[seq_id + 3] << 6);
+
+        cseq[i] = c4n;
+    }
+
+    return cseq;
+}
+
+/**
+ * @brief Returns a Set of the compressed sequences
+ *
+ * @param set
+ * @return CompressedSet
+ */
+inline CompressedSet compress_set(const Set &set)
+{
+    CompressedSet cset(set.size());
+
+#pragma omp parallel for
+    for (size_t i = 0; i < set.size(); i++)
+        cset[i] = compress_sequence(set[i]);
+
+    return cset;
+}
+
+/**
+ * @brief Concat a compressed sequence to an existing buffer
+ *
+ * @param cseqs
+ * @param cseq
+ */
+inline void push_back(CompressedSequences &cseqs, const CompressedSequence &cseq)
+{
+    size_t begin = cseqs.size();
+    cseqs.resize(begin + cseq.size());
+
+    for (size_t i = 0; i < cseq.size(); i++)
+        cseqs[begin + i] = cseq[i];
 }
 
 #endif /* AD18B383_F97E_4512_98DA_46CE2947ACDD */

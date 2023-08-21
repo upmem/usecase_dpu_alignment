@@ -14,9 +14,9 @@
  */
 typedef struct dna_reader
 {
-    uint32_t chunck;                       /// values are 2bits, 4 values are read at a time and kept in chunck.
-    uint32_t offset;                       /// offset of current value.
-    mram_sequential_reader_64 mram_reader; /// mram reader to read MRAM efficiently.
+    uint32_t chunck;           /// values are 2bits, 4 values are read at a time and kept in chunck.
+    uint32_t offset;           /// offset of current value.
+    MramSeqReader mram_reader; /// mram reader to read MRAM efficiently.
 } __attribute__((aligned(8))) dna_reader;
 
 /**
@@ -27,7 +27,7 @@ typedef struct dna_reader
  * @param group reader group
  * @return dna_reader
  */
-static inline dna_reader get_dna_reader(wram_aligned_buffer_64 *buffer, __mram_ptr uint8_t *mram_ptr, uint32_t group)
+static inline dna_reader get_dna_reader(WramAligned64 *buffer, __mram_ptr uint8_t *mram_ptr, uint32_t group)
 {
     dna_reader reader = {0, 8, get_mram_sequential_reader_64(buffer, mram_ptr, group)};
 

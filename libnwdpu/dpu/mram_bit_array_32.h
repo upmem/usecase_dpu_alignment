@@ -15,7 +15,7 @@ typedef struct mram_bit_array_32
     bool written;
 } __attribute__((aligned(8))) mram_bit_array_32;
 
-static inline mram_bit_array_32 create_mram_bit_array_32(wram_aligned_buffer_32 *buffer, __mram_ptr uint8_t *mram_ptr, uint32_t id)
+static inline mram_bit_array_32 create_mram_bit_array_32(WramAligned32 *buffer, __mram_ptr uint8_t *mram_ptr, uint32_t id)
 {
     mram_bit_array_32 array = {mram_ptr, UINT32_MAX, &buffer->buffer[32LU * id], false};
     return array;

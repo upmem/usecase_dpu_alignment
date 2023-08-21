@@ -13,43 +13,59 @@ class File
 
 public:
   File() = delete;
+
+  /// @brief Open a file
+  /// @param filename Name of file to open
   File(const std::string &filename) : f(fopen(filename.c_str(), "r")) {}
   File(const File &) = delete;
   File(File &&) = delete;
   File &operator=(const File &) = delete;
   File &operator=(File &&) = delete;
 
-  inline bool is_valid() { return f != nullptr; }
-  inline bool is_invalid() { return f == nullptr; }
-  inline void seek_end() { fseek(f, 0, SEEK_END); }
-  inline void rewind() { ::rewind(f); }
-  inline size_t tell() { return ftell(f); }
-  inline size_t read(void *__restrict__ ptr, size_t size, size_t n)
+  /// @brief Return true if file is valid
+  inline operator bool() { return f != nullptr; }
+
+  /// @brief Jump at the end of the file
+  inline void SeekEnd() { fseek(f, 0, SEEK_END); }
+
+  /// @brief Jump to the beginning of the file
+  inline void Rewind() { ::rewind(f); }
+
+  /// @brief Returns current position in the file
+  /// @return
+  inline size_t Tell() { return ftell(f); }
+
+  /// @brief Reads the file
+  /// @param ptr Pointer to a buffer the data will be writen to
+  /// @param size sizeof data
+  /// @param n Number of data to read
+  /// @return Number of data read
+  inline size_t Read(auto &ptr, size_t n)
   {
-    return fread(ptr, size, n, f);
+    return fread(ptr.data(), sizeof(ptr[0]), n, f);
   }
 
   ~File()
   {
-    if (is_valid())
+    if (*this)
       fclose(f);
   }
 };
 
 std::string file_to_memory(const std::filesystem::path &filename)
 {
-  File f(filename.c_str());
-  if (f.is_invalid())
+  File file(filename.c_str());
+  if (!file)
     exit("Invalid filename: " + filename.native());
 
-  f.seek_end();
-  size_t size = f.tell();
+  file.SeekEnd();
+  size_t size = file.Tell();
 
   std::string buffer(size, '\0');
 
-  f.rewind();
+  file.Rewind();
 
-  if (f.read(buffer.data(), sizeof(char), size) != size)
+  if (file.Read(buffer, size) != size)
     exit("Error reading: " + filename.native());
 
   return buffer;
@@ -127,7 +143,7 @@ static inline Sets lines_to_sets(const std::vector<std::string> &lines)
   return sets;
 }
 
-static inline Set lines_to_sequences(const Sequences &lines)
+static inline Set lines_to_sequences(const std::vector<std::string> &lines)
 {
   Set set(lines.size() / 2);
 
@@ -148,4 +164,11 @@ Sets read_set_fasta(const std::filesystem::path &filename)
   return read_raw_sequence_file(filename) |
          check_lines_number |
          lines_to_sets;
+}
+
+Set read_seq_fasta(const std::filesystem::path &filename)
+{
+  return read_raw_sequence_file(filename) |
+         check_lines_number |
+         lines_to_sequences;
 }

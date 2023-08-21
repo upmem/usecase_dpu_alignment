@@ -17,7 +17,7 @@ typedef struct mram_sequential_writer_64
     __mram_ptr uint8_t *mram_ptr;
 } __attribute__((aligned(8))) mram_sequential_writer_64;
 
-static inline mram_sequential_writer_64 get_mram_sequential_writer_64(wram_aligned_buffer_64 *mseq, __mram_ptr uint8_t *mram_ptr)
+static inline mram_sequential_writer_64 get_mram_sequential_writer_64(WramAligned64 *mseq, __mram_ptr uint8_t *mram_ptr)
 {
     mram_sequential_writer_64 writer = {mseq->buffer + (64LU * me()), mram_ptr};
 

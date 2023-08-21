@@ -15,6 +15,38 @@
 #include "mram_bit_array_32.h"
 
 /**
+ * @brief Structure of all variable needed to be shared in a group.
+ * Naming follow the paper: https://www.biorxiv.org/content/early/2017/09/07/130633.full.pdf
+ *
+ */
+struct align_t
+{
+    uint32_t s1;                       /// first sequence index
+    uint32_t s2;                       /// second sequence index
+    uint32_t l1;                       /// first sequence lenght
+    uint32_t l2;                       /// second sequence length
+    dna_reader dna1;                   /// first sequence dna reader
+    dna_reader dna2;                   /// second sequence dna reader
+    uint32_t s_off;                    /// index of results: score and cigar
+    uint8_t *av;                       /// pointer to av buffer 128 value
+    uint8_t *bv;                       /// pointer to bv buffer 128 value
+    uint32_t i;                        /// current position on sequence 1
+    uint32_t j;                        /// current position on sequence 2
+    int32_t *pv;                       /// pointer to pv buffer 128 values. -1 and 128 are valid.
+    int32_t *ppv;                      /// pointer to ppv buffer 128 values. -1 and 128 are valid.
+    int32_t *ev;                       /// pointer to ev buffer
+    int32_t *fv;                       /// pointer to fv buffer
+    int32_t *uv;                       /// pointer to pv or pv+1
+    int32_t *lv;                       /// pointer to pv-1 or pv
+    uint8_t *trace;                    /// pointer to trace buffer
+    Direction dir;                     /// current band direction
+    Direction prev_dir;                /// previous band direction
+    mram_bit_array_32 direction_array; /// bit array keeping all band direction in MRAM
+    uint8_t *t_e;                      /// pointer to E trace, for gap extension during backtrace
+    uint8_t *t_f;                      /// pointer to F trace, for gap extension during backtrace
+} align_data[NR_GROUPS];
+
+/**
  * @brief There is 24 tasklets split into 6 group. Each 4 consecutive tasklets are assign the same group.
  *
  * @return group of a tasklet
@@ -24,11 +56,14 @@ static inline sysname_t group()
     return me() / 4;
 }
 
-__mram uint8_t trace_buffer[NR_GROUPS][40000 / 2 * W_MAX]; /// 2 * 40000 seq on 2bits
-__mram uint8_t te_buffer[NR_GROUPS][40000 / 4 * W_MAX];    /// 2 * 40000 seq on 1bit
-__mram uint8_t tf_buffer[NR_GROUPS][40000 / 4 * W_MAX];    /// 2 * 40000 seq on 1bit
+__mram_noinit uint8_t trace_buffer[NR_GROUPS][40000 / 2 * W_MAX]; /// 2 * 40000 seq on 2bits
+__mram_noinit uint8_t te_buffer[NR_GROUPS][40000 / 4 * W_MAX];    /// 2 * 40000 seq on 1bit
+__mram_noinit uint8_t tf_buffer[NR_GROUPS][40000 / 4 * W_MAX];    /// 2 * 40000 seq on 1bit
+__mram_noinit uint8_t sequences[SCORE_MAX_SEQUENCES_TOTAL_SIZE];
+WramAligned64 dna_reader_buffer1;
+WramAligned64 dna_reader_buffer2;
 
-extern NW_dpu_metadata_input metadata;
+extern NwMetadataDPU metadata;
 
 /**
  * @brief shift right a 128 bytes buffer
@@ -81,8 +116,8 @@ static inline void shift_right_s(int32_t *vec)
     for (int i = 62; i >= 0; i--)
     {
         register uint64_t val = p[i];
-        vec[i * 2 + 2] = val >> 32;
-        vec[i * 2 + 1] = val;
+        vec[i * 2 + 1] = (int32_t)(val);
+        vec[i * 2 + 2] = (int32_t)(val >> 32);
     }
 }
 
@@ -100,9 +135,137 @@ static inline void shift_left_s(int32_t *vec)
     for (int i = 1; i < 64; i++)
     {
         register uint64_t val = p[i];
-        vec[i * 2] = val >> 32;
-        vec[i * 2 - 1] = val;
+        vec[i * 2] = (int32_t)(val >> 32);
+        vec[i * 2 - 1] = (int32_t)val;
     }
+}
+
+__host struct m_buf
+{
+    __attribute__((aligned(64))) int32_t ev[W_MAX];
+    __attribute__((aligned(64))) int32_t fv[W_MAX];
+    __attribute__((aligned(64))) int32_t pv[W_MAX + 4];
+    __attribute__((aligned(64))) int32_t ppv[W_MAX + 4];
+} align_buffers[NR_GROUPS];
+
+static void init_pv()
+{
+    const uint32_t pool_id = group();
+    const int32_t gapo = metadata.gap_opening;
+    const int32_t gape = metadata.gap_extension;
+    const int32_t gapoe = gapo + gape;
+
+    align_data[pool_id].pv = align_buffers[pool_id].pv + 2;
+
+    int32_t *pv = align_data[pool_id].pv;
+    pv[-1] = INT32_MIN / 2;
+    pv[W_MAX] = INT32_MIN / 2;
+
+    for (uint32_t i = 0; i < W_MAX; i++)
+        pv[i] = INT32_MIN / 2;
+
+    pv[W_MAX / 2] = -gapoe;
+    pv[(W_MAX / 2) - 1] = -gapoe;
+}
+
+static void init_ppv()
+{
+    const uint32_t pool_id = group();
+    align_data[pool_id].ppv = align_buffers[pool_id].ppv + 2;
+
+    int32_t *ppv = align_data[pool_id].ppv;
+    ppv[-1] = INT32_MIN / 2;
+    ppv[W_MAX] = INT32_MIN / 2;
+
+    for (uint32_t i = 0; i < W_MAX; i++)
+        ppv[i] = INT32_MIN / 2;
+
+    ppv[W_MAX / 2] = 0;
+}
+
+static void init_ev()
+{
+    const uint32_t pool_id = group();
+    const int32_t gapo = metadata.gap_opening;
+    const int32_t gape = metadata.gap_extension;
+    const int32_t gapoe = gapo + gape;
+
+    align_data[pool_id].ev = align_buffers[pool_id].ev;
+
+    int32_t *ev = align_data[pool_id].ev;
+    for (uint32_t i = 0; i < W_MAX; i++)
+        ev[i] = INT32_MIN / 2;
+
+    ev[(W_MAX / 2) - 1] = -gapoe;
+}
+
+static void init_fv()
+{
+    const uint32_t pool_id = group();
+    const int32_t gapo = metadata.gap_opening;
+    const int32_t gape = metadata.gap_extension;
+    const int32_t gapoe = gapo + gape;
+
+    align_data[pool_id].fv = align_buffers[pool_id].fv;
+
+    int32_t *fv = align_data[pool_id].fv;
+    for (uint32_t i = 0; i < W_MAX; i++)
+        fv[i] = INT32_MIN / 2;
+
+    fv[(W_MAX / 2)] = -gapoe;
+}
+
+static uint32_t init_dna1(__mram_ptr uint8_t *index)
+{
+    const uint32_t pool_id = group();
+
+    align_data[pool_id].dna1 = get_dna_reader(
+        &dna_reader_buffer1,
+        index,
+        pool_id);
+
+    int w2 = (W_MAX >> 1);
+
+    dna_reader *reader = &align_data[pool_id].dna1;
+    uint8_t *av = align_data[pool_id].av;
+    uint32_t l1 = align_data[pool_id].l1;
+
+    uint32_t i = 0;
+    for (; i < w2; i++)
+    {
+        av[i] = 'X';
+        if (i < l1)
+            av[w2 + i] = dna_reader_next(reader);
+        else
+            av[w2 + i] = 'X';
+    }
+    return i;
+}
+
+static uint32_t init_dna2(__mram_ptr uint8_t *index)
+{
+    const uint32_t pool_id = group();
+    int w2 = (W_MAX >> 1);
+
+    align_data[pool_id].dna2 = get_dna_reader(
+        &dna_reader_buffer2,
+        index,
+        pool_id);
+
+    dna_reader *reader = &align_data[pool_id].dna2;
+    uint8_t *bv = align_data[pool_id].bv;
+    uint32_t l2 = align_data[pool_id].l2;
+
+    uint32_t i = 0;
+    for (; i < w2; i++)
+    {
+        bv[w2 + i] = 'Y';
+        if (i < l2)
+            bv[w2 - 1 - i] = dna_reader_next(reader);
+        else
+            bv[w2 - 1 - i] = 'Y';
+    }
+    return i;
 }
 
 /**
@@ -163,8 +326,19 @@ static inline Direction next_direction(const int32_t *pv, uint32_t i, uint32_t l
 }
 
 static inline void send_work();
+static inline void send_work_score();
 static inline void wait_for_work();
 static inline void wait_empty_slaves();
+
+enum Functions
+{
+    AFFINE,
+    SCORE_AFFINE,
+    SHIFT_BV,
+    SHIFT_AV,
+    SHIFT_EV,
+    SHIFT_FV
+};
 
 /**
  * @brief Structure to send parameters to sleeping tasklets in group pool.
@@ -172,41 +346,9 @@ static inline void wait_empty_slaves();
  */
 struct m_param
 {
-    uint32_t start; /// starting point for score computation in compute_affine
-    int func;       /// function the tasklet needs to execute upon wake up
+    uint32_t start;      /// starting point for score computation in compute_affine
+    enum Functions func; /// function the tasklet needs to execute upon wake up
 } tasklet_params[NR_TASKLETS];
-
-/**
- * @brief Structure of all variable needed to be shared in a group.
- * Naming follow the paper: https://www.biorxiv.org/content/early/2017/09/07/130633.full.pdf
- *
- */
-struct align_t
-{
-    uint32_t s1;                       /// first sequence index
-    uint32_t s2;                       /// second sequence index
-    uint32_t l1;                       /// first sequence lenght
-    uint32_t l2;                       /// second sequence length
-    dna_reader dna1;                   /// first sequence dna reader
-    dna_reader dna2;                   /// second sequence dna reader
-    uint32_t s_off;                    /// index of results: score and cigar
-    uint8_t *av;                       /// pointer to av buffer 128 value
-    uint8_t *bv;                       /// pointer to bv buffer 128 value
-    uint32_t i;                        /// current position on sequence 1
-    uint32_t j;                        /// current position on sequence 2
-    int32_t *pv;                       /// pointer to pv buffer 128 values. -1 and 128 are valid.
-    int32_t *ppv;                      /// pointer to ppv buffer 128 values. -1 and 128 are valid.
-    int32_t *ev;                       /// pointer to ev buffer
-    int32_t *fv;                       /// pointer to fv buffer
-    int32_t *uv;                       /// pointer to pv or pv+1
-    int32_t *lv;                       /// pointer to pv -1 or pv
-    uint8_t *trace;                    /// pointer to trace buffer
-    Direction dir;                     /// current band direction
-    Direction prev_dir;                /// previous band direction
-    mram_bit_array_32 direction_array; /// bit array keeping all band direction in MRAM
-    uint8_t *t_e;                      /// pointer to E trace, for gap extension during backtrace
-    uint8_t *t_f;                      /// pointer to F trace, for gap extension during backtrace
-} align_data[NR_GROUPS];
 
 /**
  * @brief Compute all values of the new band.
@@ -216,19 +358,19 @@ static inline void compute_affine()
 {
     send_work();
 
-    const uint32_t align_id = group();
+    const uint32_t pool_id = group();
 
     // creating alias for readability, does not impact performance
-    const uint8_t *av = align_data[align_id].av;
-    const uint8_t *bv = align_data[align_id].bv;
-    int32_t *ppv = align_data[align_id].ppv;
-    int32_t *lv = align_data[align_id].lv;
-    int32_t *uv = align_data[align_id].uv;
-    int32_t *ev = align_data[align_id].ev;
-    int32_t *fv = align_data[align_id].fv;
-    uint8_t *traces = align_data[align_id].trace;
-    uint8_t *t_e = align_data[align_id].t_e;
-    uint8_t *t_f = align_data[align_id].t_f;
+    const uint8_t *av = align_data[pool_id].av;
+    const uint8_t *bv = align_data[pool_id].bv;
+    int32_t *ppv = align_data[pool_id].ppv;
+    int32_t *lv = align_data[pool_id].lv;
+    int32_t *uv = align_data[pool_id].uv;
+    int32_t *ev = align_data[pool_id].ev;
+    int32_t *fv = align_data[pool_id].fv;
+    uint8_t *traces = align_data[pool_id].trace;
+    uint8_t *t_e = align_data[pool_id].t_e;
+    uint8_t *t_f = align_data[pool_id].t_f;
 
     int32_t gape = metadata.gap_extension;
     int32_t gapoe = metadata.gap_opening + gape;
@@ -316,6 +458,86 @@ static inline void compute_affine()
     wait_empty_slaves();
 }
 
+/**
+ * @brief Compute all values of the new band.
+ *
+ */
+static inline void compute_affine_score()
+{
+    send_work_score();
+
+    const uint32_t pool_id = group();
+
+    // creating alias for readability, does not impact performance
+    const uint8_t *av = align_data[pool_id].av;
+    const uint8_t *bv = align_data[pool_id].bv;
+    int32_t *ppv = align_data[pool_id].ppv;
+    int32_t *lv = align_data[pool_id].lv;
+    int32_t *uv = align_data[pool_id].uv;
+    int32_t *ev = align_data[pool_id].ev;
+    int32_t *fv = align_data[pool_id].fv;
+
+    int32_t gape = metadata.gap_extension;
+    int32_t gapoe = metadata.gap_opening + gape;
+    int32_t match = metadata.match;
+    int32_t miss = metadata.mismatch;
+
+    for (uint32_t wi = tasklet_params[me()].start; wi < tasklet_params[me()].start + 32; wi += 4)
+    {
+        uint32_t cmp;
+        compare_4bytes(&cmp, &av[wi], &bv[wi]);
+        // #pragma unroll
+        for (int i = 0; i < 4; i++)
+        {
+            int32_t tmppv = ppv[wi + i];
+            int32_t tmpev = ev[wi + i];
+            int32_t tmpfv = fv[wi + i];
+            int32_t tmpuv = uv[wi + i];
+            int32_t tmplv = lv[wi + i];
+
+            __asm__(
+                "lsr %[cmp], %[cmp], 8, so, 1f;"
+                "add %[tmppv], %[tmppv], %[miss], true, 2f;"
+                "1:"
+                "add %[tmppv], %[tmppv], %[match];"
+                "2:"
+                "sub %[tmpuv], %[tmpuv], %[gapoe];" // 1
+                "sub %[tmpev], %[tmpev], %[gape];"  // 0
+                "jgts %[tmpev], %[tmpuv], 3f;"
+                "move %[tmpev], %[tmpuv];"
+                "3:"
+                "sub %[tmplv], %[tmplv], %[gapoe];"
+                "sub %[tmpfv], %[tmpfv], %[gape];"
+                "jgts %[tmpfv], %[tmplv], 4f;"
+                "move %[tmpfv], %[tmplv];"
+                "4:"
+                "jges %[tmppv], %[tmpev], 5f;"
+                "move %[tmppv], %[tmpev];"
+                "5:"
+                "jges %[tmppv], %[tmpfv], 6f;"
+                "move %[tmppv], %[tmpfv];"
+                "6:"
+                : [cmp] "+r"(cmp),
+                  [tmppv] "+r"(tmppv),
+                  [tmpev] "+r"(tmpev),
+                  [tmpfv] "+r"(tmpfv),
+                  [tmpuv] "+r"(tmpuv),
+                  [tmplv] "+r"(tmplv)
+                : [match] "r"(match),
+                  [miss] "r"(miss),
+                  [gapoe] "r"(gapoe),
+                  [gape] "r"(gape)
+                :);
+
+            ppv[wi + i] = tmppv;
+            ev[wi + i] = tmpev;
+            fv[wi + i] = tmpfv;
+        }
+    }
+
+    wait_empty_slaves();
+}
+
 BARRIER_INIT(b_shift1, 3);
 BARRIER_INIT(b_shift2, 3);
 BARRIER_INIT(b_shift3, 3);
@@ -349,14 +571,14 @@ static inline void wait_shift()
  */
 static inline void shift_av()
 {
-    const uint32_t align_id = group();
-    uint8_t *av = align_data[align_id].av;
+    const uint32_t pool_id = group();
+    uint8_t *av = align_data[pool_id].av;
 
     shift_left_u8(av);
     av[W_MAX - 1] = next_nucleotide(
-        &align_data[align_id].dna1,
-        align_data[align_id].i++,
-        align_data[align_id].l1,
+        &align_data[pool_id].dna1,
+        align_data[pool_id].i++,
+        align_data[pool_id].l1,
         'X');
 }
 
@@ -366,23 +588,16 @@ static inline void shift_av()
  */
 static inline void shift_bv()
 {
-    const uint32_t align_id = group();
-    uint8_t *bv = align_data[align_id].bv;
+    const uint32_t pool_id = group();
+    uint8_t *bv = align_data[pool_id].bv;
 
     shift_right_u8(bv);
     bv[0] = next_nucleotide(
-        &align_data[align_id].dna2,
-        align_data[align_id].j++,
-        align_data[align_id].l2,
+        &align_data[pool_id].dna2,
+        align_data[pool_id].j++,
+        align_data[pool_id].l2,
         'Y');
 }
-
-void init_pv();
-void init_ppv();
-void init_ev();
-void init_fv();
-uint32_t init_dna1();
-uint32_t init_dna2();
 
 /**
  * @brief tasklets are waiting for next function to compute.
@@ -398,31 +613,35 @@ static inline void wait_for_work()
 
     while (true)
     {
-        __asm__ volatile("stop;");
+        __asm__ volatile("stop false, 1f; 1:");
 
         switch (tasklet_params[me()].func)
         {
-        case 0:
+        case AFFINE:
             compute_affine();
             break;
 
-        case 1:
+        case SCORE_AFFINE:
+            compute_affine_score();
+            break;
+
+        case SHIFT_BV:
             shift_bv();
             wait_shift();
             break;
 
-        case 12:
+        case SHIFT_FV:
             shift_right_s(align_data[master].fv);
             align_data[master].fv[0] = INT32_MIN / 2;
             wait_shift();
             break;
 
-        case 2:
+        case SHIFT_AV:
             shift_av();
             wait_shift();
             break;
 
-        case 22:
+        case SHIFT_EV:
             shift_left_s(align_data[master].ev);
             align_data[master].ev[W_MAX - 1] = INT32_MIN / 2;
             wait_shift();
@@ -440,8 +659,8 @@ static inline void parallel_sr()
     sysname_t id1 = me() + 3;
     sysname_t id2 = me() + 2;
 
-    tasklet_params[id1].func = 1;
-    tasklet_params[id2].func = 12;
+    tasklet_params[id1].func = SHIFT_BV;
+    tasklet_params[id2].func = SHIFT_FV;
 
     __asm__ volatile("resume %[id], 0;" ::[id] "r"(id1));
     __asm__ volatile("resume %[id], 0;" ::[id] "r"(id2));
@@ -456,8 +675,8 @@ static inline void parallel_sl()
     sysname_t id1 = me() + 3;
     sysname_t id2 = me() + 2;
 
-    tasklet_params[id1].func = 2;
-    tasklet_params[id2].func = 22;
+    tasklet_params[id1].func = SHIFT_AV;
+    tasklet_params[id2].func = SHIFT_EV;
 
     __asm__ volatile("resume %[id], 0;" ::[id] "r"(id1));
     __asm__ volatile("resume %[id], 0;" ::[id] "r"(id2));
@@ -474,13 +693,29 @@ static inline void send_work()
         return;
 
     sysname_t id = me() + 1;
-    tasklet_params[id].func = 0;
+    tasklet_params[id].func = AFFINE;
     __asm__ volatile("resume %[id], 0;" ::[id] "r"(id));
     id++;
-    tasklet_params[id].func = 0;
+    tasklet_params[id].func = AFFINE;
     __asm__ volatile("resume %[id], 0;" ::[id] "r"(id));
     id++;
-    tasklet_params[id].func = 0;
+    tasklet_params[id].func = AFFINE;
+    __asm__ volatile("resume %[id], 0;" ::[id] "r"(id));
+}
+
+static inline void send_work_score()
+{
+    if ((me() % 4) != 0)
+        return;
+
+    sysname_t id = me() + 1;
+    tasklet_params[id].func = SCORE_AFFINE;
+    __asm__ volatile("resume %[id], 0;" ::[id] "r"(id));
+    id++;
+    tasklet_params[id].func = SCORE_AFFINE;
+    __asm__ volatile("resume %[id], 0;" ::[id] "r"(id));
+    id++;
+    tasklet_params[id].func = SCORE_AFFINE;
     __asm__ volatile("resume %[id], 0;" ::[id] "r"(id));
 }
 
