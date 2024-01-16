@@ -27,6 +27,8 @@ For 16S RNA:
 Alignment parameters can be changed in `params.yaml` and `16s.yaml`
 Output scores and cigars in scores.txt and cigars.txt respectively.
 
+Number of ranks used also in yaml files.
+
 
 ## Dataset format
 
@@ -54,4 +56,3 @@ All sequences with same number will be pair-aligned, same set number sequences m
 .
 .
 ```
-Limited to 1024 sequences for now !
