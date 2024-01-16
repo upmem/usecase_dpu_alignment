@@ -29,6 +29,7 @@ Output scores and cigars in scores.txt and cigars.txt respectively.
 
 Number of ranks used also in yaml files.
 
+A test dataset is available for the `dpu_16s` application.
 
 ## Dataset format
 
