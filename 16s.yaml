@@ -1,4 +1,4 @@
-dataset: data/s1000a.fa # data/out_ncbi_16SRNA_Bacteria.fasta #
+dataset: ../data/out_ncbi_16SRNA_Bacteria.fasta # ../data/synt_l1000_e20.fasta #data/qdataset.fasta
 ranks: 40
 
 nw_params:

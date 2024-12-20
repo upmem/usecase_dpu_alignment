@@ -4,6 +4,7 @@
 
 #include <alloc.h>
 #include <perfcounter.h>
+#include <string.h>
 
 #include "dna_reader.h"
 #include "assert.h"
@@ -19,7 +20,7 @@ __host NwMetadataDPU metadata;
 
 __mram_noinit uint8_t dirs[NR_GROUPS][DPU_MAX_SEQUENCE_SIZE * 2 / 8]; // Bit array
 
-__host NwCigarOutput output;
+__mram_noinit NwCigarOutput output;
 __mram_noinit uint8_t cigars[MAX_CIGAR_SIZE];
 __mram_noinit uint32_t cigar_indexes[METADATA_MAX_NUMBER_OF_SCORES];
 
@@ -34,6 +35,9 @@ WramAligned32 t_f_wram_buffer;
 
 __dma_aligned uint8_t buf_av[NR_GROUPS][W_MAX];
 __dma_aligned uint8_t buf_bv[NR_GROUPS][W_MAX];
+
+MUTEX_INIT(lenghts_mutex);
+MUTEX_INIT(scores_mutex);
 
 void reverse(__mram_ptr uint8_t *mram, size_t size)
 {
@@ -134,6 +138,7 @@ int align()
     wait_shift();
 
     compute_affine();
+    // compute_affine_slow();
 
     mram_write(align_data[pool_id].trace, trace_buffer[pool_id] + offset, 32LU);
     mram_write(align_data[pool_id].t_e, te_buffer[pool_id] + (offset / 2), 16LU);
@@ -227,7 +232,9 @@ int align()
     d--;
   }
 
+  mutex_lock(lenghts_mutex);
   output.lengths[align_data[pool_id].s_off] = sp;
+  mutex_unlock(lenghts_mutex);
 
   mram_buffered_array_64_flush(&res);
 
@@ -254,16 +261,18 @@ void next_pair()
   score_offset++;
   seq2_id++;
 
-  if (seq2_id == metadata.set_sizes[set_id])
+  uint8_t set_size = metadata.set_sizes[set_id];
+
+  if (seq2_id == set_size)
   {
     seq1_id++;
     seq2_id = seq1_id + 1;
   }
-  if (seq1_id == metadata.set_sizes[set_id] - 1)
+  if (seq1_id == set_size - 1)
   {
     seq1_id = 0;
     seq2_id = 1;
-    set_offset += metadata.set_sizes[set_id];
+    set_offset += set_size;
     set_id++;
   }
 }
@@ -311,7 +320,10 @@ int main()
     align_data[pool_id].s2 = local_set_offset + seq2;
     align_data[pool_id].s_off = local_score_offset;
 
-    output.scores[local_score_offset] = align();
+    int tmp_s = align();
+    mutex_lock(scores_mutex);
+    output.scores[local_score_offset] = tmp_s;
+    mutex_unlock(scores_mutex);
   }
 
   barrier_wait(&end_barrier);

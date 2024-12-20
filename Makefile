@@ -1,6 +1,6 @@
 CC := gcc
 CXX := g++
-FLAGS := -std=c++2a -O3 -march=native -Wall -Wextra -Wpedantic -fconcepts -fopenmp
+FLAGS := -std=c++2a -O3 -g -march=native -Wall -Wextra -Wpedantic -fconcepts -fopenmp
 LDFLAGS := -lyaml-cpp
 
 GCCVERSION := $(shell expr `gcc -dumpversion | cut -f1 -d.`)
@@ -23,7 +23,7 @@ clean:
 	$(RM) ${NW16S}
 	cd ./libnwdpu/dpu && make clean
 
-SRC := ./src/main_sets.cpp ./src/fasta.cpp ./libnwdpu/host/dpu_common.cpp
+SRC := ./src/main_sets.cpp ./src/fasta2.cpp ./libnwdpu/host/dpu_common.cpp
 SRC16S := ./src/main_16s.cpp ./src/fasta.cpp ./libnwdpu/host/dpu_common.cpp
 
 ${NW}: ${SRC}

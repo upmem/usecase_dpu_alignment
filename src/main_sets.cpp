@@ -34,8 +34,8 @@ int main()
     auto [dataset_path, nsets, nw_parameters, ranks] = read_parameters(home / "sets.yaml");
 
     printf("DPU mode:\n"
-           "  forcing width to 128.\n"
-           "  using %u ranks.\n\n",
+           "  Forcing width to 128.\n"
+           "  Asking for %u ranks.\n\n",
            ranks);
     nw_parameters.Print();
 
@@ -52,8 +52,8 @@ int main()
     auto alignments = dpu_cigar_pipeline("./libnwdpu/dpu/nw_affine", nw_parameters, ranks, dataset);
     compute_time.Print("  ");
 
-    /*dump_to_file("scores.txt", alignments, [](const auto &e)
-                 { return e.score; });*/
+    dump_to_file("scores.txt", alignments, [](const auto &e)
+                 { return e.score; });
 
     /*dump_to_file("cigars.txt", alignments, [](const auto &e)
                  { return e.cigar; });*/

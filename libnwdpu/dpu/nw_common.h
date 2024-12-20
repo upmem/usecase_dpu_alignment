@@ -326,14 +326,18 @@ static inline Direction next_direction(const int32_t *pv, uint32_t i, uint32_t l
 }
 
 static inline void send_work();
+static inline void send_work_slow();
 static inline void send_work_score();
+static inline void send_work_score_slow();
 static inline void wait_for_work();
 static inline void wait_empty_slaves();
 
 enum Functions
 {
     AFFINE,
+    AFFINE_S,
     SCORE_AFFINE,
+    SCORE_AFFINE_S,
     SHIFT_BV,
     SHIFT_AV,
     SHIFT_EV,
@@ -458,6 +462,89 @@ static inline void compute_affine()
     wait_empty_slaves();
 }
 
+static inline void compute_affine_slow()
+{
+    send_work_slow();
+
+    const uint32_t pool_id = group();
+
+    // creating alias for readability, does not impact performance
+    const uint8_t *av = align_data[pool_id].av;
+    const uint8_t *bv = align_data[pool_id].bv;
+    int32_t *ppv = align_data[pool_id].ppv;
+    int32_t *lv = align_data[pool_id].lv;
+    int32_t *uv = align_data[pool_id].uv;
+    int32_t *ev = align_data[pool_id].ev;
+    int32_t *fv = align_data[pool_id].fv;
+    uint8_t *traces = align_data[pool_id].trace;
+    uint8_t *t_e = align_data[pool_id].t_e;
+    uint8_t *t_f = align_data[pool_id].t_f;
+
+    int32_t gape = metadata.gap_extension;
+    int32_t gapoe = metadata.gap_opening + gape;
+    int32_t match = metadata.match;
+    int32_t miss = metadata.mismatch;
+
+    uint32_t tef = 0; // E and F traces on the same register, can shift both in one instruction
+    int count = 0;    // No need to optimize it, compiler do it fine.
+
+    for (uint32_t wi = tasklet_params[me()].start; wi < tasklet_params[me()].start + 32; wi += 4)
+    {
+        uint8_t trace = 0;
+
+        for (int i = 0; i < 4; i++)
+        {
+            uint8_t t = 0;
+            int32_t tmppv = ppv[wi + i];
+            int32_t tmpev = ev[wi + i];
+            int32_t tmpfv = fv[wi + i];
+            int32_t tmpuv = uv[wi + i];
+            int32_t tmplv = lv[wi + i];
+
+            if (av[wi + i] != bv[wi + i])
+                tmppv += miss;
+            else
+                tmppv += match, t = 64;
+
+            tmpuv -= gapoe;
+            tmpev -= gape;
+            tef >>= 1;
+
+            if (tmpev <= tmpuv)
+                tmpev = tmpuv, tef |= 128;
+
+            tmplv -= gapoe;
+            tmpfv -= gape;
+
+            if (tmpfv <= tmplv)
+                tmpfv = tmplv, tef |= 8388608;
+
+            if (tmppv < tmpev)
+                tmppv = tmpev, t = 192;
+
+            if (tmppv < tmpfv)
+                tmppv = tmpfv, t = 128;
+
+            trace = (trace >> 2) | t;
+            ppv[wi + i] = tmppv;
+            ev[wi + i] = tmpev;
+            fv[wi + i] = tmpfv;
+        }
+
+        traces[wi / 4] = trace;
+
+        if (count++ == 1)
+        {
+            t_e[wi / 8] = tef;
+            t_f[wi / 8] = tef >> 16;
+            tef = 0;
+            count = 0;
+        }
+    }
+
+    wait_empty_slaves();
+}
+
 /**
  * @brief Compute all values of the new band.
  *
@@ -528,6 +615,69 @@ static inline void compute_affine_score()
                   [gapoe] "r"(gapoe),
                   [gape] "r"(gape)
                 :);
+
+            ppv[wi + i] = tmppv;
+            ev[wi + i] = tmpev;
+            fv[wi + i] = tmpfv;
+        }
+    }
+
+    wait_empty_slaves();
+}
+
+static inline void compute_affine_score_slow()
+{
+    send_work_score_slow();
+
+    const uint32_t pool_id = group();
+
+    // creating alias for readability, does not impact performance
+    const uint8_t *av = align_data[pool_id].av;
+    const uint8_t *bv = align_data[pool_id].bv;
+    int32_t *ppv = align_data[pool_id].ppv;
+    int32_t *lv = align_data[pool_id].lv;
+    int32_t *uv = align_data[pool_id].uv;
+    int32_t *ev = align_data[pool_id].ev;
+    int32_t *fv = align_data[pool_id].fv;
+
+    int32_t gape = metadata.gap_extension;
+    int32_t gapoe = metadata.gap_opening + gape;
+    int32_t match = metadata.match;
+    int32_t miss = metadata.mismatch;
+
+    for (uint32_t wi = tasklet_params[me()].start; wi < tasklet_params[me()].start + 32; wi += 4)
+    {
+        for (int i = 0; i < 4; i++)
+        {
+            uint8_t t = 0;
+            int32_t tmppv = ppv[wi + i];
+            int32_t tmpev = ev[wi + i];
+            int32_t tmpfv = fv[wi + i];
+            int32_t tmpuv = uv[wi + i];
+            int32_t tmplv = lv[wi + i];
+
+            if (av[wi + i] != bv[wi + i])
+                tmppv += miss;
+            else
+                tmppv += match;
+
+            tmpuv -= gapoe;
+            tmpev -= gape;
+
+            if (tmpev <= tmpuv)
+                tmpev = tmpuv;
+
+            tmplv -= gapoe;
+            tmpfv -= gape;
+
+            if (tmpfv <= tmplv)
+                tmpfv = tmplv;
+
+            if (tmppv < tmpev)
+                tmppv = tmpev;
+
+            if (tmppv < tmpfv)
+                tmppv = tmpfv;
 
             ppv[wi + i] = tmppv;
             ev[wi + i] = tmpev;
@@ -621,8 +771,16 @@ static inline void wait_for_work()
             compute_affine();
             break;
 
+        case AFFINE_S:
+            compute_affine_slow();
+            break;
+
         case SCORE_AFFINE:
             compute_affine_score();
+            break;
+
+        case SCORE_AFFINE_S:
+            compute_affine_score_slow();
             break;
 
         case SHIFT_BV:
@@ -703,6 +861,22 @@ static inline void send_work()
     __asm__ volatile("resume %[id], 0;" ::[id] "r"(id));
 }
 
+static inline void send_work_slow()
+{
+    if ((me() % 4) != 0)
+        return;
+
+    sysname_t id = me() + 1;
+    tasklet_params[id].func = AFFINE_S;
+    __asm__ volatile("resume %[id], 0;" ::[id] "r"(id));
+    id++;
+    tasklet_params[id].func = AFFINE_S;
+    __asm__ volatile("resume %[id], 0;" ::[id] "r"(id));
+    id++;
+    tasklet_params[id].func = AFFINE_S;
+    __asm__ volatile("resume %[id], 0;" ::[id] "r"(id));
+}
+
 static inline void send_work_score()
 {
     if ((me() % 4) != 0)
@@ -716,6 +890,22 @@ static inline void send_work_score()
     __asm__ volatile("resume %[id], 0;" ::[id] "r"(id));
     id++;
     tasklet_params[id].func = SCORE_AFFINE;
+    __asm__ volatile("resume %[id], 0;" ::[id] "r"(id));
+}
+
+static inline void send_work_score_slow()
+{
+    if ((me() % 4) != 0)
+        return;
+
+    sysname_t id = me() + 1;
+    tasklet_params[id].func = SCORE_AFFINE_S;
+    __asm__ volatile("resume %[id], 0;" ::[id] "r"(id));
+    id++;
+    tasklet_params[id].func = SCORE_AFFINE_S;
+    __asm__ volatile("resume %[id], 0;" ::[id] "r"(id));
+    id++;
+    tasklet_params[id].func = SCORE_AFFINE_S;
     __asm__ volatile("resume %[id], 0;" ::[id] "r"(id));
 }
 
