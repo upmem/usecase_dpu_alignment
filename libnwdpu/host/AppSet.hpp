@@ -69,6 +69,14 @@ auto dpu_to_cpu(std::vector<std::vector<NwType>> &res, const NwInputCigar &input
     return res;
 }
 
+// Do not erase previous data in file
+void write_vector_to_file(const std::vector<NwCigarOutput> &v, const std::string &filename)
+{
+    std::ofstream file(filename, std::ios_base::app);
+    for (const auto &e : v)
+        file << e.perf_counter << '\n';
+}
+
 class AppSet
 {
 public:
@@ -152,6 +160,9 @@ public:
         auto size = inputs.size();
 
         std::array<std::vector<std::vector<NwType>>, 64> dpu_res{};
+
+        write_vector_to_file(outputs, std::string("counters/r") + std::to_string(id) + ".txt");
+
         // #pragma omp parallel for
         for (size_t i = 0; i < size; i++)
             dpu_to_cpu(dpu_res[i], inputs[i], outputs[i], i);

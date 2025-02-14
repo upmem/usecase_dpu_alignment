@@ -7,6 +7,7 @@
 
 #include "../libnwdpu/host/dpu_common.hpp"
 #include "fasta.hpp"
+#include "../timeline.hpp"
 
 auto read_parameters(const std::filesystem::path &filename)
 {
@@ -33,6 +34,8 @@ int main()
 
     auto [dataset_path, nsets, nw_parameters, ranks] = read_parameters(home / "sets.yaml");
 
+    Timeline timeline{"sets_time.csv"};
+
     printf("DPU mode:\n"
            "  Forcing width to 128.\n"
            "  Asking for %u ranks.\n\n",
@@ -48,9 +51,13 @@ int main()
                    encode<Sets>;
     load_time.Print("  ");
 
+    timeline.mark("Initialization");
+
     Timer compute_time{};
     auto alignments = dpu_cigar_pipeline("./libnwdpu/dpu/nw_affine", nw_parameters, ranks, dataset);
     compute_time.Print("  ");
+
+    timeline.mark("Alignement");
 
     dump_to_file("scores.txt", alignments, [](const auto &e)
                  { return e.score; });
