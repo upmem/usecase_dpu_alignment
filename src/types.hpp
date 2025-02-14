@@ -11,6 +11,8 @@
 #include <fstream>
 #include <vector>
 
+#include <immintrin.h>
+
 #include "../cdefs.h"
 #include "timer.hpp"
 
@@ -298,6 +300,34 @@ constexpr uint32_t compressed_size(size_t size)
 }
 
 /**
+ * @brief Return the size a dpu buffer needs to contains the compressed representation of a set
+ *
+ * @param size
+ * @return constexpr uint32_t
+ */
+constexpr uint32_t compressed_size(Set set)
+{
+    uint32_t total = 0;
+    for (const auto &e : set)
+        total += compressed_size(e.size());
+    return total;
+}
+
+/**
+ * @brief Return the size a dpu buffer needs to contains the compressed representation of a sets
+ *
+ * @param size
+ * @return constexpr uint32_t
+ */
+constexpr uint32_t compressed_size(Sets sets)
+{
+    uint32_t total = 0;
+    for (const auto &e : sets)
+        total += compressed_size(e);
+    return total;
+}
+
+/**
  * @brief Return the compressed representation a sequence
  *
  * @param seq
@@ -308,15 +338,12 @@ inline CompressedSequence compress_sequence(const Sequence &seq)
     uint32_t csize = compressed_size(seq.size());
     CompressedSequence cseq(csize);
 
-    for (size_t i = 0; i < cseq.size(); i++)
+    for (size_t i = 0; i < csize; i += 2)
     {
         size_t seq_id = i * 4;
-        uint8_t c4n = seq[seq_id];
-        c4n |= (seq[seq_id + 1] << 2);
-        c4n |= (seq[seq_id + 2] << 4);
-        c4n |= (seq[seq_id + 3] << 6);
 
-        cseq[i] = c4n;
+        auto c4n = _pext_u64(*(uint64_t *)(seq.data() + seq_id), 0x0303030303030303);
+        *(uint16_t *)(cseq.data() + i) = c4n;
     }
 
     return cseq;
@@ -352,6 +379,30 @@ inline void push_back(CompressedSequences &cseqs, const CompressedSequence &cseq
 
     for (size_t i = 0; i < cseq.size(); i++)
         cseqs[begin + i] = cseq[i];
+}
+
+/**
+ * @brief Concat a compressed sequence to an existing buffer
+ *
+ * @param cseqs
+ * @param cseq
+ */
+inline uint32_t compressed_emplace(CompressedSequences &cseqs, const Sequence &seq)
+{
+    const uint32_t csize = compressed_size(seq.size());
+
+    const size_t begin = cseqs.size();
+    cseqs.resize(begin + csize);
+
+    for (size_t i = 0; i < csize; i += 2)
+    {
+        size_t seq_id = i * 4;
+
+        auto c4n = _pext_u64(*(uint64_t *)(seq.data() + seq_id), 0x0303030303030303);
+        *(uint16_t *)(cseqs.data() + begin + i) = c4n;
+    }
+
+    return csize;
 }
 
 #endif /* AD18B383_F97E_4512_98DA_46CE2947ACDD */

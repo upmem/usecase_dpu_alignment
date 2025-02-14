@@ -16,8 +16,6 @@ struct SortedMap
     size_t offset{};
 };
 
-constexpr size_t max_dpu_load = 3000000;
-
 inline auto sorted_map(const Sets &data)
 {
     std::vector<SortedMap> index{data.size()};
@@ -69,6 +67,14 @@ auto dpu_to_cpu(std::vector<std::vector<NwType>> &res, const NwInputCigar &input
     }
 
     return res;
+}
+
+// Do not erase previous data in file
+void write_vector_to_file(const std::vector<NwCigarOutput> &v, const std::string &filename)
+{
+    std::ofstream file(filename, std::ios_base::app);
+    for (const auto &e : v)
+        file << e.perf_counter << '\n';
 }
 
 class AppSet
@@ -154,6 +160,9 @@ public:
         auto size = inputs.size();
 
         std::array<std::vector<std::vector<NwType>>, 64> dpu_res{};
+
+        write_vector_to_file(outputs, std::string("counters/r") + std::to_string(id) + ".txt");
+
         // #pragma omp parallel for
         for (size_t i = 0; i < size; i++)
             dpu_to_cpu(dpu_res[i], inputs[i], outputs[i], i);
@@ -173,20 +182,30 @@ public:
         return DPU_OK;
     }
 
-    static auto take_load(std::span<SortedMap> &sp, size_t load, size_t n_dpu)
+    static auto take_load(std::span<SortedMap> &sp, size_t n_dpu, size_t n_set, size_t &total_set)
     {
         if (n_dpu == 0)
             exit("Rank size is 0 !\n");
 
         int i = 0;
-        size_t tot_load = 0;
+
+        constexpr size_t threshold = 12800000;
+        size_t rank_load = 0;
+        size_t max_load = std::max(threshold, sp[0].load - (sp[0].load / 8)) * n_dpu;
+        constexpr size_t min_load = 1280000;
+
+        n_set = std::min(SCORE_METADATA_MAX_NUMBER_OF_SET * n_dpu, n_set);
+
+        // printf("%lu/%lu\n", n_set, total_set);
 
         for (const auto &sm : sp)
         {
-            if (tot_load >= load && i >= static_cast<int>(n_dpu))
+            if ((rank_load >= max_load && i >= static_cast<int>(n_dpu)) ||
+                (i > static_cast<int>(SCORE_METADATA_MAX_NUMBER_OF_SET * n_dpu)) ||
+                (i > static_cast<int>(n_set) && rank_load > min_load))
                 break;
 
-            tot_load += sm.load;
+            rank_load += sm.load;
             i++;
         }
 
@@ -195,25 +214,28 @@ public:
 
         auto b = sp.begin();
 
+        total_set -= i;
+
+        // printf("sets: %d\n", i);
+
         sp = sp.last(sp.size() - i);
 
         return std::span<SortedMap>(b, b + i);
     }
 
-    void get_bucket(std::span<SortedMap> &index_span)
+    void get_bucket(std::span<SortedMap> &index_span, size_t &total_set, size_t n_rank)
     {
-        static size_t thres = 16000000;
-
         auto n_dpu = inputs.size();
 
-        auto threshold = thres;
-        thres = thres - (thres / 45);
-        auto rl = threshold * n_dpu;
+        auto n_set = SCORE_METADATA_MAX_NUMBER_OF_SET * n_dpu;
 
-        index = take_load(index_span, rl, n_dpu);
+        if (total_set < n_set * n_rank)
+            n_set = std::max(n_dpu, total_set / n_rank);
+
+        index = take_load(index_span, n_dpu, n_set, total_set);
     }
 
-    static inline auto cpu_to_dpu(const Sets &sets, NwInputCigar &dpu_input)
+    static auto cpu_to_dpu(const Sets &sets, NwInputCigar &dpu_input)
     {
         assert(sets.size() <= SCORE_METADATA_MAX_NUMBER_OF_SET &&
                "Too many sets for DPU!\n");
@@ -233,11 +255,10 @@ public:
         {
             for (const auto &seq : set)
             {
-                auto cseq = compress_sequence(seq);
+                auto csize = compressed_emplace(dpu_input.sequences, seq);
                 meta.lengths[seq_idx] = static_cast<uint16_t>(seq.size());
                 meta.indexes[seq_idx++] = idx;
-                idx += cseq.size();
-                push_back(dpu_input.sequences, cseq);
+                idx += csize;
             }
             assert(dpu_input.sequences.size() < SCORE_MAX_SEQUENCES_TOTAL_SIZE &&
                    "dpu sequence buffer overflow!\n");
@@ -274,10 +295,6 @@ public:
             dpu_loads[min_index] += load;
             d = min_index;
         }
-
-        size_t s = 0;
-        for (const auto &set : dpu_sets)
-            s += set.size();
 
         return dpu_sets;
     }

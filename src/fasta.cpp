@@ -81,28 +81,24 @@ std::vector<std::string> split_lines(const std::string &mapped_file)
   std::vector<std::string> lines(line_count);
   size_t line = 0;
   size_t line_begin = 0;
-  size_t line_size = 0;
-  for (const auto &c : mapped_file)
+  size_t current_pos = mapped_file.find('\n');
+
+  while (current_pos != std::string::npos)
   {
-    if (c != '\n')
-      ++line_size;
-    else
-    {
-      if (line_size == 0)
-        break;
-      lines[line].resize(line_size);
-      std::copy(
-          &mapped_file.at(line_begin),
-          &mapped_file.at(line_begin + line_size),
-          lines[line].begin());
-      line++;
-      line_begin += line_size + 1;
-      line_size = 0;
-    }
+    auto line_size = current_pos - line_begin;
+    lines[line].resize(line_size);
+    std::copy(&mapped_file.at(line_begin),
+              &mapped_file.at(line_begin + line_size),
+              lines[line].begin());
+    line++;
+    line_begin += line_size + 1;
+    current_pos = mapped_file.find('\n', line_begin);
   }
 
-  if (line_size != 0)
+  if (line_begin < mapped_file.size())
   {
+    auto line_size = mapped_file.size() - line_begin;
+
     lines[line].resize(line_size);
     std::copy(
         &mapped_file.at(line_begin),

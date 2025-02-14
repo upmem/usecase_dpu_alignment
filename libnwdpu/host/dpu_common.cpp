@@ -23,12 +23,13 @@ std::vector<NwType> dpu_cigar_pipeline(std::filesystem::path dpu_bin_path, const
     auto index_span = std::span<SortedMap>(index);
     std::vector<NwType> cpu_output(count_unique_pair(sets));
 
+    size_t total_set = index_span.size();
+
     while (!index_span.empty())
     {
         auto &rank = accelerator.get_free_rank();
-        rank.algo.get_bucket(index_span);
+        rank.algo.get_bucket(index_span, total_set, n_ranks);
         rank.algo.result = cpu_output;
-
         rank.algo.to_dpu_format(sets, p);
 
         rank.send();

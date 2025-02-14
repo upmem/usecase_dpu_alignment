@@ -87,6 +87,7 @@ int align()
     wait_shift();
 
     compute_affine_score();
+    // compute_affine_score_slow();
 
     int32_t *tmpv = align_data[pool_id].pv;
     align_data[pool_id].pv = align_data[pool_id].ppv;

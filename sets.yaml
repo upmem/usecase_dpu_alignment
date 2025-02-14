@@ -1,6 +1,7 @@
-dataset: data/dataset.fasta
+app_mode: set
+dataset: ../data/hdataset.fasta # ../data/small_synth.fasta # data/hdataset.fasta #
 groundtruth: data/cigars_truth.txt
-sets_number: 20000
+sets_number: 10000000
 ranks: 40
 
 nw_params:
