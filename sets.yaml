@@ -1,3 +1,4 @@
+app_mode: set
 dataset: ../data/hdataset.fasta # ../data/small_synth.fasta # data/hdataset.fasta #
 groundtruth: data/cigars_truth.txt
 sets_number: 10000000

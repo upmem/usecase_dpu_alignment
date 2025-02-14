@@ -3,48 +3,52 @@
  */
 
 #include <fstream>
-#include <yaml-cpp/yaml.h>
 
 #include "../libnwdpu/host/dpu_common.hpp"
-#include "fasta.hpp"
-#include "../timeline.hpp"
+#include "timeline.hpp"
+#include <vector>
+#include <variant>
+#include <functional>
 
-auto read_parameters(const std::filesystem::path &filename)
+#include "parameters.hpp"
+template <class... Ts>
+struct overloaded : Ts...
 {
-    auto config = YAML::LoadFile(filename.native());
-    auto path = config["dataset"].as<std::string>();
-    auto sets_number = config["sets_number"].as<uint32_t>();
-    auto ranks = config["ranks"].as<uint32_t>();
-    auto params = config["nw_params"];
+    using Ts::operator()...;
+};
+template <class... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
+using AlignmentResult = std::variant<std::vector<NwType>, std::vector<int>>;
 
-    return std::tuple{
-        path,
-        sets_number,
-        NwParameters{params["match"].as<int32_t>(),
-                     params["mismatch"].as<int32_t>(),
-                     params["gap_opening"].as<int32_t>(),
-                     params["gap_extension"].as<int32_t>(),
-                     128},
-        ranks};
+void write_to_file(AlignmentResult &alignments)
+{
+    std::visit(overloaded{[](const std::vector<NwType> &vec)
+                          {
+                              dump_to_file("scores.txt", vec, [](const auto &e)
+                                           { return e.score; });
+                              dump_to_file("cigars.txt", vec, [](const auto &e)
+                                           { return e.cigar; });
+                          },
+                          [](const std::vector<int> &vec)
+                          {
+                              dump_to_file("scores.txt", vec, [](const auto &e)
+                                           { return e; });
+                          }},
+               alignments);
 }
 
-int main()
+int main(int argc, char **argv)
 {
-    const auto home = std::filesystem::canonical("/proc/self/exe").parent_path();
+    auto [dataset_path, nsets, nw_parameters, ranks, app_mode] = populate_parameters(argc, argv);
 
-    auto [dataset_path, nsets, nw_parameters, ranks] = read_parameters(home / "sets.yaml");
+    Timeline timeline{"log_times.csv"};
 
-    Timeline timeline{"sets_time.csv"};
-
-    printf("DPU mode:\n"
-           "  Forcing width to 128.\n"
-           "  Asking for %u ranks.\n\n",
-           ranks);
+    printf("DPU ranks: %u\n\n", ranks);
     nw_parameters.Print();
 
     printf("Dataset:\n");
     Timer load_time{};
-    auto dataset = read_set_fasta(home / dataset_path) |
+    auto dataset = read_set_fasta(dataset_path) |
                    print_size<Sets>("  max: ") |
                    resize<Sets>(nsets) |
                    print_size<Sets>("  use: ") |
@@ -53,17 +57,44 @@ int main()
 
     timeline.mark("Initialization");
 
+    AlignmentResult alignments;
+
     Timer compute_time{};
-    auto alignments = dpu_cigar_pipeline("./libnwdpu/dpu/nw_affine", nw_parameters, ranks, dataset);
+    switch (app_mode)
+    {
+    case AppMode::Set:
+    {
+        alignments = dpu_cigar_pipeline("./libnwdpu/dpu/nw_affine", nw_parameters, ranks, dataset);
+        break;
+    }
+    case AppMode::Pair:
+        break;
+    case AppMode::All:
+    {
+        printf("All against all mode not implemented yet, use dpu_16S\n");
+        break;
+    }
+    default:
+        printf("Unknown application mode\n");
+        break;
+    }
+
     compute_time.Print("  ");
 
     timeline.mark("Alignement");
 
-    dump_to_file("scores.txt", alignments, [](const auto &e)
-                 { return e.score; });
+    if (std::holds_alternative<std::vector<NwType>>(alignments))
+    {
+        printf("Returned vector of NwType\n");
+        printf("Scores and CIGARs were computed\n");
+    }
+    else if (std::holds_alternative<std::vector<int>>(alignments))
+    {
+        printf("Returned vector of int\n");
+        printf("Only scores were computed\n");
+    }
 
-    /*dump_to_file("cigars.txt", alignments, [](const auto &e)
-                 { return e.cigar; });*/
+    write_to_file(alignments);
 
     return 0;
 }
